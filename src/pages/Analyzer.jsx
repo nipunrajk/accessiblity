@@ -5,6 +5,7 @@ import { getAIAnalysis, getIssueRecommendations } from '../services/langchain';
 import { supabase } from '../lib/supabase';
 import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
+import AIProviderSettings from '../components/AIProviderSettings';
 
 function Analyzer() {
   const [websiteUrl, setWebsiteUrl] = useState('');
@@ -207,23 +208,18 @@ function Analyzer() {
       const displayScore = typeof value === 'object' ? value.score || 0 : score;
 
       return (
-        <div
-          key={title}
-          className='flex items-center justify-between p-2 border-b border-gray-100 last:border-0'
-        >
-          <span className='text-sm font-medium text-gray-600'>{title}</span>
-          <div className='flex items-center gap-2'>
-            <span className='text-sm text-gray-800'>
+        <div key={title} className='flex items-center justify-between py-2'>
+          <span className='text-sm text-gray-600'>{title}</span>
+          <div className='flex items-center gap-3'>
+            <span className='text-sm font-medium text-gray-900'>
               {typeof displayValue === 'number'
                 ? Math.round(displayValue) + 'ms'
                 : displayValue}
             </span>
             <div
-              className='w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white'
+              className='w-2 h-2 rounded-full'
               style={{ backgroundColor: getScoreColor(displayScore) }}
-            >
-              {typeof displayScore === 'number' ? Math.round(displayScore) : 0}
-            </div>
+            ></div>
           </div>
         </div>
       );
@@ -233,7 +229,7 @@ function Analyzer() {
       if (label !== 'Performance' || !data.metrics) return null;
 
       return (
-        <div className='mt-4 border rounded-lg overflow-hidden bg-gray-50'>
+        <div className='space-y-1'>
           {data.metrics.fcp &&
             renderMetricItem('First Contentful Paint', data.metrics.fcp)}
           {data.metrics.lcp &&
@@ -416,24 +412,23 @@ function Analyzer() {
     };
 
     return (
-      <div className='bg-white p-6 rounded-xl shadow-lg'>
-        <div className='flex items-center justify-between mb-4'>
-          <h3 className='text-xl font-bold text-gray-800'>{label}</h3>
-          <div
-            className='text-3xl font-bold px-4 py-2 rounded-lg'
-            style={{
-              color: getScoreColor(data.score),
-              backgroundColor: `${getScoreColor(data.score)}15`,
-            }}
-          >
-            {Math.round(data.score)}%
+      <div className='bg-white border border-gray-200 rounded-2xl p-6'>
+        <div className='flex items-center justify-between mb-6'>
+          <h3 className='text-lg font-semibold text-gray-900'>{label}</h3>
+          <div className='text-right'>
+            <div className='text-2xl font-bold text-gray-900'>
+              {Math.round(data.score)}%
+            </div>
+            <div className='text-sm text-gray-500'>Score</div>
           </div>
         </div>
-        {label === 'Performance' && renderPerformanceMetrics()}
-        {label === 'Accessibility' && renderAccessibilityMetrics()}
-        {label === 'SEO' && renderSEOMetrics()}
-        {label === 'Best Practices' && renderBestPracticesMetrics()}
-        {renderAuditDetails()}
+
+        <div className='space-y-4'>
+          {label === 'Performance' && renderPerformanceMetrics()}
+          {label === 'Accessibility' && renderAccessibilityMetrics()}
+          {label === 'SEO' && renderSEOMetrics()}
+          {label === 'Best Practices' && renderBestPracticesMetrics()}
+        </div>
       </div>
     );
   };
@@ -484,223 +479,130 @@ function Analyzer() {
     };
 
     return (
-      <div className='mt-8 bg-white p-6 rounded-xl shadow-lg max-w-4xl w-full'>
-        <h2 className='text-2xl font-bold text-gray-800 mb-6'>Issues Report</h2>
+      <div className='bg-white border border-gray-200 rounded-2xl p-8'>
+        <div className='flex items-center justify-between mb-8'>
+          <h2 className='text-2xl font-bold text-gray-900'>Issues Found</h2>
+          <span className='text-sm text-gray-500'>
+            {filteredIssues.length} issues
+          </span>
+        </div>
 
-        <div className='flex gap-2 mb-6'>
+        <div className='flex flex-wrap gap-2 mb-8'>
           <button
             onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               selectedCategory === 'all'
-                ? 'bg-gray-800 text-white'
+                ? 'bg-black text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            All Issues
+            All ({allIssues.length})
           </button>
           {['performance', 'accessibility', 'best-practices', 'seo'].map(
-            (type) => (
-              <button
-                key={type}
-                onClick={() => setSelectedCategory(type)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
-                  selectedCategory === type
-                    ? 'bg-gray-800 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </button>
-            )
+            (type) => {
+              const count = allIssues.filter(
+                (issue) => issue.type === type
+              ).length;
+              return (
+                <button
+                  key={type}
+                  onClick={() => setSelectedCategory(type)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedCategory === type
+                      ? 'bg-black text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)} ({count})
+                </button>
+              );
+            }
           )}
         </div>
 
-        <div className='flex justify-end gap-4 mb-6'>
-          <button
-            onClick={handleNavigateToAiFix}
-            className='px-6 py-3 bg-black text-white rounded-lg font-medium flex items-center gap-2 hover:bg-gray-800 transition-colors'
-          >
-            <svg
-              className='w-5 h-5'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M13 10V3L4 14h7v7l9-11h-7z'
-              />
-            </svg>
-            Get AI Fix
-          </button>
-        </div>
-
-        <div className='space-y-6'>
-          {filteredIssues.map((issue, index) => (
-            <div
-              key={index}
-              className='border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow'
-            >
-              <div className='flex items-start justify-between mb-3'>
-                <div>
-                  <div className='flex items-center gap-2 mb-1'>
-                    <span className={`font-medium ${getTypeColor(issue.type)}`}>
-                      {issue.type.charAt(0).toUpperCase() + issue.type.slice(1)}
-                    </span>
-                    {/* <span
-                      className={`text-xs px-2 py-1 rounded-full ${getImpactColor(
-                        issue.impact,
-                        issue.type
-                      )}`}
-                    >
-                      {getImpactLabel(issue.impact, issue.type)} Impact (
-                      {issue.impact}%)
-                    </span> */}
-                  </div>
-                  <h3 className='text-lg font-semibold text-gray-800'>
-                    {issue.title}
-                  </h3>
-                </div>
-                {/* <div
-                  className='w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium text-white'
-                  style={{ backgroundColor: getScoreColor(issue.score / 100) }}
+        <div className='space-y-4'>
+          {filteredIssues.length === 0 ? (
+            <div className='text-center py-12'>
+              <div className='w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                <svg
+                  className='w-8 h-8 text-green-600'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
                 >
-                  {Math.round(issue.score)}
-                </div> */}
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M5 13l4 4L19 7'
+                  />
+                </svg>
               </div>
-
-              <p className='text-gray-600 mb-4'>{issue.description}</p>
-
-              {/* Remove or comment out the ShowRecommendations button and its related functionality */}
-              {/* <div>
-                <ShowRecommendations />
-                {expandedRecommendations[index] && (
-                  <div>
-                    {loadingStates[index] ? (
-                      <div className='flex justify-center py-4'>
-                        <Spinner />
-                      </div>
-                    ) : (
-                      <div className='space-y-4'>
-                        {aiRecommendations[index]?.map((rec, recIndex) => (
-                          <div key={recIndex} className='bg-gray-50 rounded-lg p-4'>
-                            <div className='flex justify-end mb-2'>
-                              <span className='bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded'>
-                                AI Generated
-                              </span>
-                            </div>
-
-                            <h4 className='font-medium text-gray-800 mb-2'>
-                              {rec.suggestion}
-                            </h4>
-
-                            {rec.implementation && (
-                              <div className='bg-green-50 p-3 rounded-lg mt-2'>
-                                <span className='font-medium text-green-700'>
-                                  Implementation:
-                                </span>
-                                <p className='mt-1 text-green-800'>
-                                  {rec.implementation}
-                                </p>
-                              </div>
-                            )}
-
-                            {rec.expectedImpact && (
-                              <div className='bg-blue-50 p-3 rounded-lg mt-2'>
-                                <span className='font-medium text-blue-700'>
-                                  Expected Impact:
-                                </span>
-                                <p className='mt-1 text-blue-800'>
-                                  {rec.expectedImpact}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )} */}
-
-              {validationResults[issue.title] && (
-                <div
-                  className={`mt-3 p-3 rounded-lg ${
-                    validationResults[issue.title].status === 'success'
-                      ? 'bg-green-50 text-green-700'
-                      : 'bg-red-50 text-red-700'
-                  }`}
-                >
-                  {validationResults[issue.title].message}
-                </div>
-              )}
+              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+                No Issues Found
+              </h3>
+              <p className='text-gray-600'>
+                Great! No issues were found in this category.
+              </p>
             </div>
-          ))}
+          ) : (
+            filteredIssues.map((issue, index) => (
+              <div
+                key={index}
+                className='border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors'
+              >
+                <div className='flex items-start justify-between mb-4'>
+                  <div className='flex-1'>
+                    <div className='flex items-center gap-3 mb-2'>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          issue.type === 'performance'
+                            ? 'bg-blue-100 text-blue-700'
+                            : issue.type === 'accessibility'
+                            ? 'bg-green-100 text-green-700'
+                            : issue.type === 'best-practices'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}
+                      >
+                        {issue.type.charAt(0).toUpperCase() +
+                          issue.type.slice(1)}
+                      </span>
+                    </div>
+                    <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+                      {issue.title}
+                    </h3>
+                    <p className='text-gray-600 leading-relaxed'>
+                      {issue.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className='w-full min-h-screen bg-gray-100 text-black'>
-      <div className='fixed top-4 left-4'>
-        <img src='/logo.svg' alt='Logo' className='w-28 h-12' />
-      </div>
-
-      <div className='flex flex-col items-center min-h-screen px-8 py-16'>
-        <div className='max-w-2xl'>
-          <h4 className='text-3xl font-bold mb-4 text-center'>
-            AI-Powered Website Performance Optimization
-          </h4>
-          <p className='text-gray-600 text-center text-md mb-8'>
-            Automatically analyze and optimize your website's performance with
-            our advanced AI tools. Improve load times, SEO rankings, and user
-            experience.
-          </p>
-          <form onSubmit={handleSubmit} className='w-full flex gap-4'>
-            <input
-              type='url'
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder='Enter your website URL'
-              required
-              className='flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white'
-            />
-            <div className='flex gap-4'>
+    <div className='min-h-screen bg-white'>
+      {/* Header */}
+      <header className='border-b border-gray-100'>
+        <div className='max-w-7xl mx-auto px-6 py-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-3'>
+              <div className='w-8 h-8 bg-black rounded-lg flex items-center justify-center'>
+                <span className='text-white font-bold text-sm'>FF</span>
+              </div>
+              <span className='font-semibold text-gray-900'>FastFix</span>
+            </div>
+            <div className='flex items-center gap-4'>
+              <AIProviderSettings />
               <button
-                type='submit'
-                disabled={loading}
-                className='px-6 py-3 bg-black text-white rounded-lg font-medium flex items-center gap-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-              >
-                {loading ? (
-                  <>
-                    <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className='w-5 h-5'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
-                      />
-                    </svg>
-                    Analyze Now
-                  </>
-                )}
-              </button>
-              <button
-                type='button'
                 onClick={() => navigate('/github-config')}
-                className='px-6 py-3 bg-black text-white rounded-lg font-medium flex items-center gap-2 hover:bg-gray-800 transition-colors'
+                className='p-2 text-gray-600 hover:text-gray-900 transition-colors'
+                title='GitHub Integration'
               >
                 <svg
                   className='w-5 h-5'
@@ -709,23 +611,83 @@ function Analyzer() {
                 >
                   <path d='M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z' />
                 </svg>
-                GitHub
               </button>
             </div>
-          </form>
+          </div>
         </div>
+      </header>
 
-        {loading && (
-          <div className='max-w-2xl w-full mt-4 bg-white p-4 rounded-lg shadow-lg'>
-            <div className='flex flex-col items-center'>
-              <div className='mb-2'>Assessing website performance...</div>
-              <div className='text-sm text-gray-600'>
-                Pages Scanned: {scanStats.pagesScanned}
-                {scanStats.totalPages > 0 && ` / ${scanStats.totalPages}`}
+      <div className='max-w-7xl mx-auto px-6 py-12'>
+        {/* Hero Section */}
+        {!results && (
+          <div className='text-center mb-16'>
+            <h1 className='text-4xl font-bold text-gray-900 mb-4'>
+              Website Performance Analysis
+            </h1>
+            <p className='text-xl text-gray-600 mb-12 max-w-2xl mx-auto'>
+              Get AI-powered insights to optimize your website's performance,
+              accessibility, and SEO
+            </p>
+
+            <form onSubmit={handleSubmit} className='max-w-2xl mx-auto'>
+              <div className='flex gap-3'>
+                <input
+                  type='url'
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder='https://example.com'
+                  required
+                  className='flex-1 px-6 py-4 text-lg border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white'
+                />
+                <button
+                  type='submit'
+                  disabled={loading}
+                  className='px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+                >
+                  {loading ? (
+                    <>
+                      <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-white'></div>
+                      Analyzing
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className='w-5 h-5'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M13 10V3L4 14h7v7l9-11h-7z'
+                        />
+                      </svg>
+                      Analyze
+                    </>
+                  )}
+                </button>
               </div>
-              <div className='w-full bg-gray-200 rounded-full h-2.5 mt-2 mb-4'>
+            </form>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className='max-w-2xl mx-auto'>
+            <div className='bg-white border border-gray-200 rounded-2xl p-8 text-center'>
+              <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4'></div>
+              <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+                Analyzing Website
+              </h3>
+              <p className='text-gray-600 mb-4'>
+                Scanning {scanStats.pagesScanned} of{' '}
+                {scanStats.totalPages || '?'} pages
+              </p>
+              <div className='w-full bg-gray-200 rounded-full h-2'>
                 <div
-                  className='bg-blue-600 h-2.5 rounded-full'
+                  className='bg-black h-2 rounded-full transition-all duration-300'
                   style={{
                     width: `${
                       scanStats.totalPages
@@ -735,155 +697,241 @@ function Analyzer() {
                   }}
                 ></div>
               </div>
-              {scanStats.scannedUrls.length > 0 && (
-                <div className='w-full mt-4'>
-                  <h3 className='text-sm font-medium text-gray-700 mb-2'>
-                    Scanned URLs:
-                  </h3>
-                  <div className='max-h-40 overflow-y-auto bg-gray-50 rounded pt-2 px-4 pb-2'>
-                    {scanStats.scannedUrls.map((url, index) => (
-                      <div
-                        key={index}
-                        className='text-xs text-gray-600 border-b border-gray-200 last:border-0 first:pt-0 py-3'
-                      >
-                        {url}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
 
+        {/* Error State */}
         {error && (
-          <div className='bg-red-50 border-l-4 border-red-400 p-4 rounded'>
-            <p className='text-red-700'>{error}</p>
+          <div className='max-w-2xl mx-auto'>
+            <div className='bg-red-50 border border-red-200 rounded-2xl p-6'>
+              <div className='flex items-center gap-3'>
+                <div className='w-8 h-8 bg-red-100 rounded-full flex items-center justify-center'>
+                  <svg
+                    className='w-4 h-4 text-red-600'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                    />
+                  </svg>
+                </div>
+                <p className='text-red-800 font-medium'>{error}</p>
+              </div>
+            </div>
           </div>
         )}
 
+        {/* Results Section */}
         {results && (
-          <>
-            <div className='bg-white p-8 rounded-lg shadow-lg mt-4 max-w-4xl w-full'>
-              <h2 className='text-xl font-bold text-gray-800 mb-6'>
-                Analysis Results
+          <div className='space-y-8'>
+            {/* Header with URL */}
+            <div className='text-center'>
+              <h2 className='text-2xl font-bold text-gray-900 mb-2'>
+                Analysis Complete
               </h2>
+              <p className='text-gray-600'>{websiteUrl}</p>
+            </div>
 
-              {aiLoading ? (
-                <div className='flex items-center justify-center p-4'>
-                  <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600'></div>
-                </div>
-              ) : (
-                <div className='bg-[#F8FAFC] p-8 rounded-lg'>
-                  <div className='flex items-center gap-2 mb-6'>
-                    <svg
-                      className='w-6 h-6'
+            {/* Score Overview */}
+            <div className='grid grid-cols-2 md:grid-cols-4 gap-6'>
+              <div className='text-center'>
+                <div className='relative w-20 h-20 mx-auto mb-3'>
+                  <svg
+                    className='w-20 h-20 transform -rotate-90'
+                    viewBox='0 0 36 36'
+                  >
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
                       fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M13 10V3L4 14h7v7l9-11h-7z'
-                      />
-                    </svg>
-                    <h3 className='text-xl font-semibold'>AI Insights</h3>
-                  </div>
-
-                  <div className='space-y-6'>
-                    {/* Overall Assessment */}
-                    <div>
-                      <h4 className='text-lg font-medium mb-4'>
-                        1. Overall Assessment:
-                      </h4>
-                      <div className='bg-white p-4 rounded-lg'>
-                        <div className='mb-2'>
-                          <div className='flex justify-between mb-2 font-medium'>
-                            <span>Performance Score</span>
-                            <span>
-                              {Math.round(results.performance.score)}%
-                            </span>
-                          </div>
-                          <div className='w-full bg-gray-200 rounded-full h-2'>
-                            <div
-                              className='bg-black rounded-full h-2'
-                              style={{
-                                width: `${results.performance.score}%`,
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-                        <p className='text-gray-600'>
-                          {aiAnalysis
-                            ?.split('2. Critical Issues:')[0]
-                            ?.replace('1. Overall Assessment:', '')
-                            ?.trim()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className='text-lg font-medium mb-4'>
-                        2. Critical Issues:
-                      </h4>
-                      <div className='bg-white p-4 rounded-lg mb-2'>
-                        <p className='text-gray-600'>
-                          {aiAnalysis
-                            ?.split('2. Critical Issues:')[1]
-                            ?.split('3. Key Recommendations:')[0]
-                            ?.trim()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className='text-lg font-medium mb-4'>
-                        3. Key Recommendations:
-                      </h4>
-                      <div className='bg-white p-4 rounded-lg mb-2'>
-                        <p className='text-gray-600'>
-                          {aiAnalysis
-                            ?.split('3. Key Recommendations:')[1]
-                            ?.trim()}
-                        </p>
-                      </div>
-                    </div>
+                      stroke='#f3f4f6'
+                      strokeWidth='2'
+                    />
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke={getScoreColor(results.performance.score)}
+                      strokeWidth='2'
+                      strokeDasharray={`${results.performance.score}, 100`}
+                    />
+                  </svg>
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <span className='text-lg font-bold text-gray-900'>
+                      {Math.round(results.performance.score)}
+                    </span>
                   </div>
                 </div>
-              )}
-
-              <div className='text-lg font-semibold text-gray-600 my-6'>
-                <div>Total Pages Scanned: {scanStats.pagesScanned}</div>
-                {scanStats.scannedUrls.length > 0 && (
-                  <div className='mt-4 p-4 bg-gray-50 rounded-lg'>
-                    <h3 className='font-medium mb-2'>Scanned URLs:</h3>
-                    <div className='max-h-40 overflow-y-auto bg-gray-50 rounded p-2'>
-                      {scanStats.scannedUrls.map((url, index) => (
-                        <div
-                          key={index}
-                          className='text-xs text-gray-600 border-b border-gray-200 last:border-0 first:pt-0 py-3'
-                        >
-                          {url}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <h3 className='font-semibold text-gray-900'>Performance</h3>
+                <p className='text-sm text-gray-600'>Speed & Optimization</p>
               </div>
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-                <ScoreCard label='Performance' data={results.performance} />
-                <ScoreCard label='Accessibility' data={results.accessibility} />
-                <ScoreCard
-                  label='Best Practices'
-                  data={results.bestPractices}
-                />
-                <ScoreCard label='SEO' data={results.seo} />
+
+              <div className='text-center'>
+                <div className='relative w-20 h-20 mx-auto mb-3'>
+                  <svg
+                    className='w-20 h-20 transform -rotate-90'
+                    viewBox='0 0 36 36'
+                  >
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke='#f3f4f6'
+                      strokeWidth='2'
+                    />
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke={getScoreColor(results.accessibility.score)}
+                      strokeWidth='2'
+                      strokeDasharray={`${results.accessibility.score}, 100`}
+                    />
+                  </svg>
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <span className='text-lg font-bold text-gray-900'>
+                      {Math.round(results.accessibility.score)}
+                    </span>
+                  </div>
+                </div>
+                <h3 className='font-semibold text-gray-900'>Accessibility</h3>
+                <p className='text-sm text-gray-600'>Inclusive Design</p>
+              </div>
+
+              <div className='text-center'>
+                <div className='relative w-20 h-20 mx-auto mb-3'>
+                  <svg
+                    className='w-20 h-20 transform -rotate-90'
+                    viewBox='0 0 36 36'
+                  >
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke='#f3f4f6'
+                      strokeWidth='2'
+                    />
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke={getScoreColor(results.bestPractices.score)}
+                      strokeWidth='2'
+                      strokeDasharray={`${results.bestPractices.score}, 100`}
+                    />
+                  </svg>
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <span className='text-lg font-bold text-gray-900'>
+                      {Math.round(results.bestPractices.score)}
+                    </span>
+                  </div>
+                </div>
+                <h3 className='font-semibold text-gray-900'>Best Practices</h3>
+                <p className='text-sm text-gray-600'>Code Quality</p>
+              </div>
+
+              <div className='text-center'>
+                <div className='relative w-20 h-20 mx-auto mb-3'>
+                  <svg
+                    className='w-20 h-20 transform -rotate-90'
+                    viewBox='0 0 36 36'
+                  >
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke='#f3f4f6'
+                      strokeWidth='2'
+                    />
+                    <path
+                      d='M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831'
+                      fill='none'
+                      stroke={getScoreColor(results.seo.score)}
+                      strokeWidth='2'
+                      strokeDasharray={`${results.seo.score}, 100`}
+                    />
+                  </svg>
+                  <div className='absolute inset-0 flex items-center justify-center'>
+                    <span className='text-lg font-bold text-gray-900'>
+                      {Math.round(results.seo.score)}
+                    </span>
+                  </div>
+                </div>
+                <h3 className='font-semibold text-gray-900'>SEO</h3>
+                <p className='text-sm text-gray-600'>Search Optimization</p>
               </div>
             </div>
+
+            {/* AI Insights */}
+            {aiLoading ? (
+              <div className='bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center'>
+                <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4'></div>
+                <p className='text-gray-600'>Generating AI insights...</p>
+              </div>
+            ) : (
+              aiAnalysis && (
+                <div className='bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-8'>
+                  <div className='flex items-center gap-3 mb-6'>
+                    <div className='w-8 h-8 bg-black rounded-lg flex items-center justify-center'>
+                      <svg
+                        className='w-4 h-4 text-white'
+                        fill='none'
+                        stroke='currentColor'
+                        viewBox='0 0 24 24'
+                      >
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M13 10V3L4 14h7v7l9-11h-7z'
+                        />
+                      </svg>
+                    </div>
+                    <h3 className='text-xl font-bold text-gray-900'>
+                      AI Insights
+                    </h3>
+                  </div>
+                  <div className='prose prose-gray max-w-none'>
+                    <pre className='whitespace-pre-wrap text-gray-700 leading-relaxed'>
+                      {aiAnalysis}
+                    </pre>
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* Action Button */}
+            <div className='text-center'>
+              <button
+                onClick={handleNavigateToAiFix}
+                className='inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors'
+              >
+                <svg
+                  className='w-5 h-5'
+                  fill='none'
+                  stroke='currentColor'
+                  viewBox='0 0 24 24'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M13 10V3L4 14h7v7l9-11h-7z'
+                  />
+                </svg>
+                Get AI Fixes
+              </button>
+            </div>
+
+            {/* Detailed Metrics */}
+            <div className='grid md:grid-cols-2 gap-8'>
+              <ScoreCard label='Performance' data={results.performance} />
+              <ScoreCard label='Accessibility' data={results.accessibility} />
+              <ScoreCard label='Best Practices' data={results.bestPractices} />
+              <ScoreCard label='SEO' data={results.seo} />
+            </div>
+
             <IssueReport results={results} />
-          </>
+          </div>
         )}
       </div>
     </div>

@@ -1,19 +1,5 @@
-import { OpenAI } from '@langchain/openai';
 import { PromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence } from '@langchain/core/runnables';
-
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-
-if (!OPENAI_API_KEY) {
-  console.error('OpenAI API key is not set. Please check your .env file.');
-}
-
-// Initialize the OpenAI model
-const model = new OpenAI({
-  openAIApiKey: OPENAI_API_KEY,
-  modelName: 'gpt-3.5-turbo-instruct',
-  temperature: 0.7,
-});
+import aiProvider from './aiProvider.js';
 
 // Create a prompt template for analysis
 const analysisPrompt = PromptTemplate.fromTemplate(`
@@ -40,9 +26,6 @@ Please provide a concise analysis in the following format:
 
 Keep the response clear and actionable, focusing on the most impactful improvements.
 `);
-
-// Create the analysis chain
-const analysisChain = RunnableSequence.from([analysisPrompt, model]);
 
 // Create a prompt template for issue-specific recommendations
 const issueRecommendationPrompt = PromptTemplate.fromTemplate(`
@@ -83,11 +66,7 @@ For code examples, include:
 Keep recommendations technical, specific, and focused on WCAG 2.1 compliance.
 `);
 
-// Create the recommendation chain
-const recommendationChain = RunnableSequence.from([
-  issueRecommendationPrompt,
-  model,
-]);
+// No need for chains anymore, we'll use aiProvider directly
 
 export async function getAIAnalysis(results) {
   try {
@@ -104,10 +83,8 @@ export async function getAIAnalysis(results) {
       tti: results.performance.metrics?.tti?.displayValue || 'N/A',
     };
 
-    const response = await analysisChain.invoke(input);
-    return (
-      response?.choices?.[0]?.message?.content || response?.content || response
-    );
+    const response = await aiProvider.invoke(analysisPrompt, input);
+    return response;
   } catch (error) {
     console.error('AI Analysis failed:', error);
     throw new Error('Failed to generate AI analysis');
@@ -123,9 +100,7 @@ export async function getIssueRecommendations(issue) {
       impact: issue.impact,
     };
 
-    const response = await recommendationChain.invoke(input);
-    const content =
-      response?.choices?.[0]?.message?.content || response?.content || response;
+    const content = await aiProvider.invoke(issueRecommendationPrompt, input);
 
     if (!content) {
       throw new Error('No content in AI response');
