@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { runLighthouseAnalysis } from "../services/lighthouse";
-import { getAIAnalysis, getIssueRecommendations } from "../services/langchain";
-import { supabase } from "../lib/supabase";
-import { scanWebsiteElements } from "../services/domScanner";
-import { getFixSuggestions } from "../services/aiFix";
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { runLighthouseAnalysis } from '../services/lighthouse';
+import { getAIAnalysis, getIssueRecommendations } from '../services/langchain';
+import { supabase } from '../lib/supabase';
+import { scanWebsiteElements } from '../services/domScanner';
+import { getFixSuggestions } from '../services/aiFix';
 
 function Analyzer() {
-  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
@@ -45,7 +45,7 @@ function Analyzer() {
         const suggestions = await getFixSuggestions(elements);
         setElementIssues(Array.isArray(suggestions) ? suggestions : []);
       } catch (err) {
-        setError("Failed to scan elements: " + err.message);
+        setError('Failed to scan elements: ' + err.message);
         setElementIssues([]); // Reset to empty array on error
       } finally {
         setIsScanning(false);
@@ -61,9 +61,9 @@ function Analyzer() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("website_analyses")
-        .select("*")
-        .eq("id", id)
+        .from('website_analyses')
+        .select('*')
+        .eq('id', id)
         .single();
 
       if (error) throw error;
@@ -99,7 +99,7 @@ function Analyzer() {
         high: 10,
         medium: 5,
       },
-      "best-practices": {
+      'best-practices': {
         critical: 20,
         high: 12,
         medium: 6,
@@ -112,15 +112,15 @@ function Analyzer() {
     };
 
     const categoryThresholds = thresholds[type] || thresholds.performance;
-    if (impactNum >= categoryThresholds.critical) return "Critical";
-    if (impactNum >= categoryThresholds.high) return "High";
-    if (impactNum >= categoryThresholds.medium) return "Medium";
-    return "Low";
+    if (impactNum >= categoryThresholds.critical) return 'Critical';
+    if (impactNum >= categoryThresholds.high) return 'High';
+    if (impactNum >= categoryThresholds.medium) return 'Medium';
+    return 'Low';
   };
 
   const getScoreColor = (score) => {
-    if (typeof score !== "number" || isNaN(score)) return "#ef4444";
-    return score >= 90 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444";
+    if (typeof score !== 'number' || isNaN(score)) return '#ef4444';
+    return score >= 90 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
   };
 
   const handleSubmit = async (e) => {
@@ -132,19 +132,8 @@ function Analyzer() {
     setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
 
     try {
-      const { data: analysis, error: dbError } = await supabase
-        .from("website_analyses")
-        .insert([
-          {
-            website_url: websiteUrl,
-            status: "pending",
-          },
-        ])
-        .select()
-        .single();
-
-      if (dbError) throw dbError;
-
+      // Temporarily skip Supabase for testing
+      const analysis = { id: Date.now().toString() };
       setAnalysisId(analysis.id);
 
       const response = await runLighthouseAnalysis(websiteUrl, (progress) => {
@@ -169,41 +158,21 @@ function Analyzer() {
         scannedUrls: response.scanStats?.scannedUrls || scanStats.scannedUrls,
       };
 
-      const { error: updateError } = await supabase
-        .from("website_analyses")
-        .update({
-          status: "completed",
-          performance_score: response.performance.score,
-          accessibility_score: response.accessibility.score,
-          best_practices_score: response.bestPractices.score,
-          seo_score: response.seo.score,
-          scan_stats: finalScanStats,
-          lighthouse_results: {
-            performance: response.performance,
-            accessibility: response.accessibility,
-            bestPractices: response.bestPractices,
-            seo: response.seo,
-          },
-          ai_analysis: aiAnalysisResult,
-        })
-        .eq("id", analysis.id);
-
-      if (updateError) throw updateError;
+      // Temporarily skip Supabase update for testing
+      console.log('Analysis completed:', {
+        performance: response.performance.score,
+        accessibility: response.accessibility.score,
+        bestPractices: response.bestPractices.score,
+        seo: response.seo.score,
+      });
 
       setScanStats(finalScanStats);
 
       navigate(`/analyze/${analysis.id}`);
     } catch (err) {
       setError(err.message);
-      if (analysisId) {
-        await supabase
-          .from("website_analyses")
-          .update({
-            status: "failed",
-            scan_stats: scanStats,
-          })
-          .eq("id", analysisId);
-      }
+      // Temporarily skip Supabase error update
+      console.error('Analysis failed:', err.message);
     } finally {
       setLoading(false);
       setAiLoading(false);
@@ -219,7 +188,7 @@ function Analyzer() {
       ...(Array.isArray(elementIssues) ? elementIssues : []),
     ];
 
-    navigate("/ai-fix", {
+    navigate('/ai-fix', {
       state: {
         issues: allIssues,
         websiteUrl,
@@ -234,8 +203,8 @@ function Analyzer() {
 
     const renderMetricItem = (title, value, score) => {
       const displayValue =
-        typeof value === "object" ? value.displayValue || value.value : value;
-      const displayScore = typeof value === "object" ? value.score || 0 : score;
+        typeof value === 'object' ? value.displayValue || value.value : value;
+      const displayScore = typeof value === 'object' ? value.score || 0 : score;
 
       return (
         <div
@@ -245,15 +214,15 @@ function Analyzer() {
           <span className='text-sm font-medium text-gray-600'>{title}</span>
           <div className='flex items-center gap-2'>
             <span className='text-sm text-gray-800'>
-              {typeof displayValue === "number"
-                ? Math.round(displayValue) + "ms"
+              {typeof displayValue === 'number'
+                ? Math.round(displayValue) + 'ms'
                 : displayValue}
             </span>
             <div
               className='w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white'
               style={{ backgroundColor: getScoreColor(displayScore) }}
             >
-              {typeof displayScore === "number" ? Math.round(displayScore) : 0}
+              {typeof displayScore === 'number' ? Math.round(displayScore) : 0}
             </div>
           </div>
         </div>
@@ -261,27 +230,27 @@ function Analyzer() {
     };
 
     const renderPerformanceMetrics = () => {
-      if (label !== "Performance" || !data.metrics) return null;
+      if (label !== 'Performance' || !data.metrics) return null;
 
       return (
         <div className='mt-4 border rounded-lg overflow-hidden bg-gray-50'>
           {data.metrics.fcp &&
-            renderMetricItem("First Contentful Paint", data.metrics.fcp)}
+            renderMetricItem('First Contentful Paint', data.metrics.fcp)}
           {data.metrics.lcp &&
-            renderMetricItem("Largest Contentful Paint", data.metrics.lcp)}
+            renderMetricItem('Largest Contentful Paint', data.metrics.lcp)}
           {data.metrics.tbt &&
-            renderMetricItem("Total Blocking Time", data.metrics.tbt)}
+            renderMetricItem('Total Blocking Time', data.metrics.tbt)}
           {data.metrics.cls &&
-            renderMetricItem("Cumulative Layout Shift", data.metrics.cls)}
-          {data.metrics.si && renderMetricItem("Speed Index", data.metrics.si)}
+            renderMetricItem('Cumulative Layout Shift', data.metrics.cls)}
+          {data.metrics.si && renderMetricItem('Speed Index', data.metrics.si)}
           {data.metrics.tti &&
-            renderMetricItem("Time to Interactive", data.metrics.tti)}
+            renderMetricItem('Time to Interactive', data.metrics.tti)}
         </div>
       );
     };
 
     const renderAccessibilityMetrics = () => {
-      if (label !== "Accessibility" || !data.issues) return null;
+      if (label !== 'Accessibility' || !data.issues) return null;
 
       const findIssue = (keywords) => {
         return data.issues.find((i) =>
@@ -290,27 +259,27 @@ function Analyzer() {
       };
 
       const metrics = {
-        colorContrast: findIssue(["contrast", "color"]),
-        headings: findIssue(["heading", "h1", "h2", "h3", "header"]),
-        aria: findIssue(["aria", "accessible name", "role"]),
-        imageAlts: findIssue(["image", "alt", "img"]),
-        linkNames: findIssue(["link", "anchor", "href"]),
+        colorContrast: findIssue(['contrast', 'color']),
+        headings: findIssue(['heading', 'h1', 'h2', 'h3', 'header']),
+        aria: findIssue(['aria', 'accessible name', 'role']),
+        imageAlts: findIssue(['image', 'alt', 'img']),
+        linkNames: findIssue(['link', 'anchor', 'href']),
       };
 
       return (
         <div className='mt-4 border rounded-lg overflow-hidden bg-gray-50'>
           {Object.entries(metrics).map(([key, issue]) => {
             const title = {
-              colorContrast: "Color Contrast",
-              headings: "Headings",
-              aria: "ARIA",
-              imageAlts: "Image Alts",
-              linkNames: "Link Names",
+              colorContrast: 'Color Contrast',
+              headings: 'Headings',
+              aria: 'ARIA',
+              imageAlts: 'Image Alts',
+              linkNames: 'Link Names',
             }[key];
 
             return renderMetricItem(
               title,
-              issue ? `${issue.items?.length || 0} issues` : "Pass",
+              issue ? `${issue.items?.length || 0} issues` : 'Pass',
               issue ? issue.score : 100
             );
           })}
@@ -319,7 +288,7 @@ function Analyzer() {
     };
 
     const renderSEOMetrics = () => {
-      if (label !== "SEO" || !data.issues) return null;
+      if (label !== 'SEO' || !data.issues) return null;
 
       const findIssue = (keywords) => {
         return data.issues.find((i) =>
@@ -328,33 +297,33 @@ function Analyzer() {
       };
 
       const metrics = {
-        metaDescription: findIssue(["meta description", "meta"]),
-        titleTags: findIssue(["title tag", "title element"]),
+        metaDescription: findIssue(['meta description', 'meta']),
+        titleTags: findIssue(['title tag', 'title element']),
         headingStructure: findIssue([
-          "heading",
-          "h1",
-          "h2",
-          "h3",
-          "header structure",
+          'heading',
+          'h1',
+          'h2',
+          'h3',
+          'header structure',
         ]),
-        mobileOptimization: findIssue(["mobile", "viewport", "responsive"]),
-        urlStructure: findIssue(["url", "slug", "permalink"]),
+        mobileOptimization: findIssue(['mobile', 'viewport', 'responsive']),
+        urlStructure: findIssue(['url', 'slug', 'permalink']),
       };
 
       return (
         <div className='mt-4 border rounded-lg overflow-hidden bg-gray-50'>
           {Object.entries(metrics).map(([key, issue]) => {
             const title = {
-              metaDescription: "Meta Description",
-              titleTags: "Title Tags",
-              headingStructure: "Heading Structure",
-              mobileOptimization: "Mobile Optimization",
-              urlStructure: "URL Structure",
+              metaDescription: 'Meta Description',
+              titleTags: 'Title Tags',
+              headingStructure: 'Heading Structure',
+              mobileOptimization: 'Mobile Optimization',
+              urlStructure: 'URL Structure',
             }[key];
 
             return renderMetricItem(
               title,
-              issue ? `${issue.items?.length || 0} issues` : "Pass",
+              issue ? `${issue.items?.length || 0} issues` : 'Pass',
               issue ? issue.score : 100
             );
           })}
@@ -363,7 +332,7 @@ function Analyzer() {
     };
 
     const renderBestPracticesMetrics = () => {
-      if (label !== "Best Practices" || !data.issues) return null;
+      if (label !== 'Best Practices' || !data.issues) return null;
 
       const findIssue = (keywords) => {
         return data.issues.find((i) =>
@@ -372,14 +341,14 @@ function Analyzer() {
       };
 
       const metrics = {
-        https: findIssue(["https", "ssl", "secure"]),
-        doctype: findIssue(["doctype", "html5", "document type"]),
-        javascriptErrors: findIssue(["javascript", "error", "console"]),
-        mobileFriendly: findIssue(["mobile", "viewport", "responsive"]),
+        https: findIssue(['https', 'ssl', 'secure']),
+        doctype: findIssue(['doctype', 'html5', 'document type']),
+        javascriptErrors: findIssue(['javascript', 'error', 'console']),
+        mobileFriendly: findIssue(['mobile', 'viewport', 'responsive']),
         browserCompatibility: findIssue([
-          "browser",
-          "compatibility",
-          "support",
+          'browser',
+          'compatibility',
+          'support',
         ]),
       };
 
@@ -387,15 +356,15 @@ function Analyzer() {
         <div className='mt-4 border rounded-lg overflow-hidden bg-gray-50'>
           {Object.entries(metrics).map(([key, issue]) => {
             const title = {
-              https: "HTTPS Usage",
-              doctype: "Valid Doctype",
-              javascriptErrors: "No JavaScript Errors",
-              mobileFriendly: "Mobile Friendly",
-              browserCompatibility: "Browser Compatibility",
+              https: 'HTTPS Usage',
+              doctype: 'Valid Doctype',
+              javascriptErrors: 'No JavaScript Errors',
+              mobileFriendly: 'Mobile Friendly',
+              browserCompatibility: 'Browser Compatibility',
             }[key];
 
-            const symbol = !issue ? "✓" : "✗";
-            const symbolColor = !issue ? "text-green-600" : "text-red-600";
+            const symbol = !issue ? '✓' : '✗';
+            const symbolColor = !issue ? 'text-green-600' : 'text-red-600';
 
             return (
               <div
@@ -460,17 +429,17 @@ function Analyzer() {
             {Math.round(data.score)}%
           </div>
         </div>
-        {label === "Performance" && renderPerformanceMetrics()}
-        {label === "Accessibility" && renderAccessibilityMetrics()}
-        {label === "SEO" && renderSEOMetrics()}
-        {label === "Best Practices" && renderBestPracticesMetrics()}
+        {label === 'Performance' && renderPerformanceMetrics()}
+        {label === 'Accessibility' && renderAccessibilityMetrics()}
+        {label === 'SEO' && renderSEOMetrics()}
+        {label === 'Best Practices' && renderBestPracticesMetrics()}
         {renderAuditDetails()}
       </div>
     );
   };
 
   const IssueReport = ({ results }) => {
-    const [selectedCategory, setSelectedCategory] = useState("all");
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [validationResults, setValidationResults] = useState({});
 
     const allIssues = [
@@ -481,36 +450,36 @@ function Analyzer() {
     ].sort((a, b) => parseFloat(b.impact) - parseFloat(a.impact));
 
     const filteredIssues =
-      selectedCategory === "all"
+      selectedCategory === 'all'
         ? allIssues
         : allIssues.filter((issue) => issue.type === selectedCategory);
 
     const getTypeColor = (type) => {
       switch (type) {
-        case "performance":
-          return "text-blue-600";
-        case "accessibility":
-          return "text-green-600";
-        case "best-practices":
-          return "text-purple-600";
-        case "seo":
-          return "text-orange-600";
+        case 'performance':
+          return 'text-blue-600';
+        case 'accessibility':
+          return 'text-green-600';
+        case 'best-practices':
+          return 'text-purple-600';
+        case 'seo':
+          return 'text-orange-600';
         default:
-          return "text-gray-600";
+          return 'text-gray-600';
       }
     };
 
     const getImpactColor = (impact, type) => {
       const label = getImpactLabel(impact, type);
       switch (label) {
-        case "Critical":
-          return "bg-red-100 text-red-800";
-        case "High":
-          return "bg-orange-100 text-orange-800";
-        case "Medium":
-          return "bg-yellow-100 text-yellow-800";
+        case 'Critical':
+          return 'bg-red-100 text-red-800';
+        case 'High':
+          return 'bg-orange-100 text-orange-800';
+        case 'Medium':
+          return 'bg-yellow-100 text-yellow-800';
         default:
-          return "bg-green-100 text-green-800";
+          return 'bg-green-100 text-green-800';
       }
     };
 
@@ -520,24 +489,24 @@ function Analyzer() {
 
         <div className='flex gap-2 mb-6'>
           <button
-            onClick={() => setSelectedCategory("all")}
+            onClick={() => setSelectedCategory('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
-              selectedCategory === "all"
-                ? "bg-gray-800 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              selectedCategory === 'all'
+                ? 'bg-gray-800 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             All Issues
           </button>
-          {["performance", "accessibility", "best-practices", "seo"].map(
+          {['performance', 'accessibility', 'best-practices', 'seo'].map(
             (type) => (
               <button
                 key={type}
                 onClick={() => setSelectedCategory(type)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ${
                   selectedCategory === type
-                    ? "bg-gray-800 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? 'bg-gray-800 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -658,9 +627,9 @@ function Analyzer() {
               {validationResults[issue.title] && (
                 <div
                   className={`mt-3 p-3 rounded-lg ${
-                    validationResults[issue.title].status === "success"
-                      ? "bg-green-50 text-green-700"
-                      : "bg-red-50 text-red-700"
+                    validationResults[issue.title].status === 'success'
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-red-50 text-red-700'
                   }`}
                 >
                   {validationResults[issue.title].message}
@@ -730,7 +699,7 @@ function Analyzer() {
               </button>
               <button
                 type='button'
-                onClick={() => navigate("/github-config")}
+                onClick={() => navigate('/github-config')}
                 className='px-6 py-3 bg-black text-white rounded-lg font-medium flex items-center gap-2 hover:bg-gray-800 transition-colors'
               >
                 <svg
@@ -848,8 +817,8 @@ function Analyzer() {
                         </div>
                         <p className='text-gray-600'>
                           {aiAnalysis
-                            ?.split("2. Critical Issues:")[0]
-                            ?.replace("1. Overall Assessment:", "")
+                            ?.split('2. Critical Issues:')[0]
+                            ?.replace('1. Overall Assessment:', '')
                             ?.trim()}
                         </p>
                       </div>
@@ -862,8 +831,8 @@ function Analyzer() {
                       <div className='bg-white p-4 rounded-lg mb-2'>
                         <p className='text-gray-600'>
                           {aiAnalysis
-                            ?.split("2. Critical Issues:")[1]
-                            ?.split("3. Key Recommendations:")[0]
+                            ?.split('2. Critical Issues:')[1]
+                            ?.split('3. Key Recommendations:')[0]
                             ?.trim()}
                         </p>
                       </div>
@@ -876,7 +845,7 @@ function Analyzer() {
                       <div className='bg-white p-4 rounded-lg mb-2'>
                         <p className='text-gray-600'>
                           {aiAnalysis
-                            ?.split("3. Key Recommendations:")[1]
+                            ?.split('3. Key Recommendations:')[1]
                             ?.trim()}
                         </p>
                       </div>

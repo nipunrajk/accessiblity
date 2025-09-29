@@ -1,17 +1,17 @@
-import { OpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { RunnableSequence } from "@langchain/core/runnables";
+import { OpenAI } from '@langchain/openai';
+import { PromptTemplate } from '@langchain/core/prompts';
+import { RunnableSequence } from '@langchain/core/runnables';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
-  console.error("OpenAI API key is not set. Please check your .env file.");
+  console.error('OpenAI API key is not set. Please check your .env file.');
 }
 
 // Initialize the OpenAI model
 const model = new OpenAI({
   openAIApiKey: OPENAI_API_KEY,
-  modelName: "gpt-3.5-turbo",
+  modelName: 'gpt-3.5-turbo-instruct',
   temperature: 0.7,
 });
 
@@ -96,12 +96,12 @@ export async function getAIAnalysis(results) {
       accessibility: Math.round(results.accessibility.score),
       bestPractices: Math.round(results.bestPractices.score),
       seo: Math.round(results.seo.score),
-      fcp: results.performance.metrics?.fcp?.displayValue || "N/A",
-      lcp: results.performance.metrics?.lcp?.displayValue || "N/A",
-      tbt: results.performance.metrics?.tbt?.displayValue || "N/A",
-      cls: results.performance.metrics?.cls?.displayValue || "N/A",
-      si: results.performance.metrics?.si?.displayValue || "N/A",
-      tti: results.performance.metrics?.tti?.displayValue || "N/A",
+      fcp: results.performance.metrics?.fcp?.displayValue || 'N/A',
+      lcp: results.performance.metrics?.lcp?.displayValue || 'N/A',
+      tbt: results.performance.metrics?.tbt?.displayValue || 'N/A',
+      cls: results.performance.metrics?.cls?.displayValue || 'N/A',
+      si: results.performance.metrics?.si?.displayValue || 'N/A',
+      tti: results.performance.metrics?.tti?.displayValue || 'N/A',
     };
 
     const response = await analysisChain.invoke(input);
@@ -109,8 +109,8 @@ export async function getAIAnalysis(results) {
       response?.choices?.[0]?.message?.content || response?.content || response
     );
   } catch (error) {
-    console.error("AI Analysis failed:", error);
-    throw new Error("Failed to generate AI analysis");
+    console.error('AI Analysis failed:', error);
+    throw new Error('Failed to generate AI analysis');
   }
 }
 
@@ -128,7 +128,7 @@ export async function getIssueRecommendations(issue) {
       response?.choices?.[0]?.message?.content || response?.content || response;
 
     if (!content) {
-      throw new Error("No content in AI response");
+      throw new Error('No content in AI response');
     }
 
     // Parse the recommendations
@@ -137,33 +137,33 @@ export async function getIssueRecommendations(issue) {
 
     for (const section of sections) {
       const lines = section
-        .split("\n")
+        .split('\n')
         .map((line) => line.trim())
         .filter(Boolean);
       const title = lines[0];
-      let implementation = "";
-      let codeExample = "";
-      let expectedImpact = "";
+      let implementation = '';
+      let codeExample = '';
+      let expectedImpact = '';
 
       // Process each line
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (line.includes("Implementation:")) {
-          implementation = line.replace("- Implementation:", "").trim();
-        } else if (line.includes("Code Example:")) {
+        if (line.includes('Implementation:')) {
+          implementation = line.replace('- Implementation:', '').trim();
+        } else if (line.includes('Code Example:')) {
           // Find the code block
-          let codeBlock = "";
+          let codeBlock = '';
           i++; // Move to next line
-          if (i < lines.length && lines[i].includes("```")) {
+          if (i < lines.length && lines[i].includes('```')) {
             i++; // Skip the opening ```
-            while (i < lines.length && !lines[i].includes("```")) {
-              codeBlock += lines[i] + "\n";
+            while (i < lines.length && !lines[i].includes('```')) {
+              codeBlock += lines[i] + '\n';
               i++;
             }
           }
           codeExample = codeBlock.trim();
-        } else if (line.includes("Expected Impact:")) {
-          expectedImpact = line.replace("- Expected Impact:", "").trim();
+        } else if (line.includes('Expected Impact:')) {
+          expectedImpact = line.replace('- Expected Impact:', '').trim();
         }
       }
 
@@ -179,8 +179,8 @@ export async function getIssueRecommendations(issue) {
 
     return recommendations;
   } catch (error) {
-    console.error("AI Recommendations failed:", error);
-    console.error("Error details:", error.message);
-    throw new Error("Failed to generate recommendations");
+    console.error('AI Recommendations failed:', error);
+    console.error('Error details:', error.message);
+    throw new Error('Failed to generate recommendations');
   }
 }
