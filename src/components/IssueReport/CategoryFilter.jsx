@@ -7,8 +7,8 @@ function CategoryFilter({ selectedCategory, onCategoryChange, allIssues }) {
         onClick={() => onCategoryChange('all')}
         className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
           selectedCategory === 'all'
-            ? 'bg-black text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-black dark:bg-white text-white dark:text-black'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
         }`}
       >
         All ({allIssues.length})
@@ -21,8 +21,8 @@ function CategoryFilter({ selectedCategory, onCategoryChange, allIssues }) {
             onClick={() => onCategoryChange(type)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               selectedCategory === type
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-black dark:bg-white text-white dark:text-black'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             {type.charAt(0).toUpperCase() + type.slice(1)} ({count})

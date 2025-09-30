@@ -1,32 +1,23 @@
 {
-  "name": "backend",
+  "name": "fastfix-backend",
   "version": "1.0.0",
+  "description": "Backend service for FastFix website analyzer",
   "main": "server.js",
-  "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon server.js",
+    "install-deps": "npm install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.64.0",
-    "@google/generative-ai": "^0.24.1",
-    "@langchain/anthropic": "^0.3.28",
-    "@langchain/core": "^0.3.77",
-    "@langchain/google-genai": "^0.2.18",
-    "@langchain/openai": "^0.6.13",
-    "@octokit/rest": "^21.1.0",
-    "axios": "^1.12.2",
-    "chrome-launcher": "^1.1.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
     "express": "^4.18.2",
-    "groq-sdk": "^0.33.0",
-    "jsdom": "^27.0.0",
-    "lighthouse": "^11.6.0",
-    "puppeteer": "^24.1.1"
+    "cors": "^2.8.5",
+    "puppeteer": "^21.5.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
