@@ -1,180 +1,208 @@
-import { ChatOpenAI } from '@langchain/openai';
-import { ChatAnthropic } from '@langchain/anthropic';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// AI Provider Configuration
-const AI_PROVIDER = process.env.AI_PROVIDER || 'openai';
-
-// API Keys
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-
-// Models
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-const ANTHROPIC_MODEL =
-  process.env.ANTHROPIC_MODEL || 'claude-3-sonnet-20240229';
-const GOOGLE_MODEL = process.env.GOOGLE_MODEL || 'gemini-pro';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'mixtral-8x7b-32768';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama2';
-
-class BackendAIProvider {
+class AIProvider {
   constructor() {
-    this.model = this.initializeModel();
+    this.provider = this.getActiveProvider();
   }
 
-  initializeModel() {
-    switch (AI_PROVIDER.toLowerCase()) {
-      case 'openai':
-        if (!OPENAI_API_KEY) {
-          throw new Error(
-            'OpenAI API key is not set. Please check your .env file.'
-          );
+  getActiveProvider() {
+    const aiProvider = process.env.AI_PROVIDER || 'openai';
+
+    switch (aiProvider) {
+      case 'openrouter':
+        if (process.env.OPENROUTER_API_KEY) {
+          return {
+            name: 'openrouter',
+            apiKey: process.env.OPENROUTER_API_KEY,
+            model: process.env.OPENROUTER_MODEL || 'x-ai/grok-4-fast:free',
+            baseUrl: 'https://openrouter.ai/api/v1',
+          };
         }
-        return new ChatOpenAI({
-          openAIApiKey: OPENAI_API_KEY,
-          modelName: OPENAI_MODEL,
-          temperature: 0.7,
-        });
+        break;
+
+      case 'openai':
+        if (process.env.OPENAI_API_KEY) {
+          return {
+            name: 'openai',
+            apiKey: process.env.OPENAI_API_KEY,
+            model: process.env.OPENAI_MODEL || 'gpt-3.5-turbo',
+            baseUrl: 'https://api.openai.com/v1',
+          };
+        }
+        break;
 
       case 'anthropic':
-        if (!ANTHROPIC_API_KEY) {
-          throw new Error(
-            'Anthropic API key is not set. Please check your .env file.'
-          );
+        if (process.env.ANTHROPIC_API_KEY) {
+          return {
+            name: 'anthropic',
+            apiKey: process.env.ANTHROPIC_API_KEY,
+            model: process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307',
+            baseUrl: 'https://api.anthropic.com/v1',
+          };
         }
-        return new ChatAnthropic({
-          anthropicApiKey: ANTHROPIC_API_KEY,
-          modelName: ANTHROPIC_MODEL,
-          temperature: 0.7,
-        });
-
-      case 'google':
-        if (!GOOGLE_API_KEY) {
-          throw new Error(
-            'Google API key is not set. Please check your .env file.'
-          );
-        }
-        return new ChatGoogleGenerativeAI({
-          apiKey: GOOGLE_API_KEY,
-          modelName: GOOGLE_MODEL,
-          temperature: 0.7,
-        });
+        break;
 
       case 'groq':
-        if (!GROQ_API_KEY) {
-          throw new Error(
-            'Groq API key is not set. Please check your .env file.'
-          );
+        if (process.env.GROQ_API_KEY) {
+          return {
+            name: 'groq',
+            apiKey: process.env.GROQ_API_KEY,
+            model: process.env.GROQ_MODEL || 'mixtral-8x7b-32768',
+            baseUrl: 'https://api.groq.com/openai/v1',
+          };
         }
-        return new ChatOpenAI({
-          openAIApiKey: GROQ_API_KEY,
-          modelName: GROQ_MODEL,
-          temperature: 0.7,
-          configuration: {
-            baseURL: 'https://api.groq.com/openai/v1',
-          },
-        });
+        break;
 
       case 'ollama':
-        return new ChatOpenAI({
-          openAIApiKey: 'ollama', // Ollama doesn't require API key
-          modelName: OLLAMA_MODEL,
-          temperature: 0.7,
-          configuration: {
-            baseURL: `${OLLAMA_BASE_URL}/v1`,
-          },
-        });
-
-      default:
-        console.warn(
-          `Unknown AI provider: ${AI_PROVIDER}. Falling back to OpenAI.`
-        );
-        return new ChatOpenAI({
-          openAIApiKey: OPENAI_API_KEY,
-          modelName: OPENAI_MODEL,
-          temperature: 0.7,
-        });
+        return {
+          name: 'ollama',
+          model: process.env.OLLAMA_MODEL || 'llama2',
+          baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+        };
     }
+
+    return null;
+  }
+
+  isAvailable() {
+    return this.provider !== null;
   }
 
   async invoke(prompt) {
-    try {
-      const response = await this.model.invoke(prompt);
+    if (!this.provider) {
+      throw new Error('No AI provider configured');
+    }
 
-      // Handle different response formats
-      if (typeof response === 'string') {
-        return response;
-      } else if (response?.content) {
-        return response.content;
-      } else if (response?.choices?.[0]?.message?.content) {
-        return response.choices[0].message.content;
-      } else {
-        return response;
-      }
-    } catch (error) {
-      console.error(`Backend AI Provider (${AI_PROVIDER}) error:`, error);
-      throw new Error(`Failed to get AI response: ${error.message}`);
+    switch (this.provider.name) {
+      case 'openrouter':
+        return await this.invokeOpenRouter(prompt);
+      case 'openai':
+        return await this.invokeOpenAI(prompt);
+      case 'anthropic':
+        return await this.invokeAnthropic(prompt);
+      case 'groq':
+        return await this.invokeGroq(prompt);
+      case 'ollama':
+        return await this.invokeOllama(prompt);
+      default:
+        throw new Error(`Unsupported AI provider: ${this.provider.name}`);
     }
   }
 
-  // For direct API calls (useful for Ollama or custom implementations)
-  async invokeDirectly(prompt) {
-    switch (AI_PROVIDER.toLowerCase()) {
-      case 'ollama':
-        return this.invokeOllama(prompt);
-      default:
-        return this.invoke(prompt);
+  async invokeOpenAI(prompt) {
+    const response = await fetch(`${this.provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
+  }
+
+  async invokeOpenRouter(prompt) {
+    const response = await fetch(`${this.provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
+  }
+
+  async invokeAnthropic(prompt) {
+    const response = await fetch(`${this.provider.baseUrl}/messages`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.provider.apiKey,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.content[0]?.text || '';
+  }
+
+  async invokeGroq(prompt) {
+    const response = await fetch(`${this.provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content || '';
   }
 
   async invokeOllama(prompt) {
-    try {
-      const response = await axios.post(`${OLLAMA_BASE_URL}/api/generate`, {
-        model: OLLAMA_MODEL,
+    const response = await fetch(`${this.provider.baseUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
         prompt: prompt,
         stream: false,
-      });
-      return response.data.response;
-    } catch (error) {
-      console.error('Ollama API error:', error);
-      throw new Error(`Failed to get Ollama response: ${error.message}`);
-    }
-  }
+      }),
+    });
 
-  getProviderInfo() {
-    return {
-      provider: AI_PROVIDER,
-      model: this.getModelName(),
-      isLocal: AI_PROVIDER === 'ollama',
-    };
-  }
-
-  getModelName() {
-    switch (AI_PROVIDER.toLowerCase()) {
-      case 'openai':
-        return OPENAI_MODEL;
-      case 'anthropic':
-        return ANTHROPIC_MODEL;
-      case 'google':
-        return GOOGLE_MODEL;
-      case 'groq':
-        return GROQ_MODEL;
-      case 'ollama':
-        return OLLAMA_MODEL;
-      default:
-        return 'unknown';
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.statusText}`);
     }
+
+    const data = await response.json();
+    return data.response || '';
   }
 }
 
-// Create singleton instance
-const backendAIProvider = new BackendAIProvider();
-
-export default backendAIProvider;
+export default new AIProvider();

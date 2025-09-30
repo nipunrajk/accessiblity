@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { runLighthouseAnalysis } from '../services/lighthouse';
-import { getAIAnalysis } from '../services/langchain';
 import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
 
@@ -20,6 +19,7 @@ export const useAnalysis = () => {
   });
   const [scannedElements, setScannedElements] = useState([]);
   const [elementIssues, setElementIssues] = useState([]);
+  const [aiFixes, setAiFixes] = useState(null);
 
   const navigate = useNavigate();
 
@@ -28,6 +28,7 @@ export const useAnalysis = () => {
     setError(null);
     setResults(null);
     setAiAnalysis(null);
+    setAiFixes(null);
     setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
 
     try {
@@ -45,13 +46,26 @@ export const useAnalysis = () => {
         seo: response.seo,
       });
 
-      // Generate AI analysis only if AI is available
+      // Generate AI analysis using backend endpoint
       const hasAI = isAIAvailable();
       if (hasAI) {
         setAiLoading(true);
         try {
-          const aiAnalysisResult = await getAIAnalysis(response);
-          setAiAnalysis(aiAnalysisResult);
+          const aiResponse = await fetch('/api/ai-analysis', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ results: response }),
+          });
+
+          if (aiResponse.ok) {
+            const { analysis } = await aiResponse.json();
+            setAiAnalysis(analysis);
+          } else {
+            console.error('AI Analysis failed:', aiResponse.statusText);
+            setAiAnalysis(null);
+          }
         } catch (aiError) {
           console.error('AI Analysis failed:', aiError);
           // Don't fail the entire analysis if AI fails
@@ -59,16 +73,42 @@ export const useAnalysis = () => {
         }
       }
 
-      // Scan elements only if AI is available
+      // Scan elements and generate AI fixes if AI is available
       if (hasAI) {
         try {
           const { elements } = await scanWebsiteElements(websiteUrl);
           setScannedElements(elements);
-          const suggestions = await getFixSuggestions(elements);
-          setElementIssues(Array.isArray(suggestions) ? suggestions : []);
+
+          // Get all issues for AI fixes
+          const allIssues = [
+            ...(response?.performance?.issues || []),
+            ...(response?.accessibility?.issues || []),
+            ...(response?.bestPractices?.issues || []),
+            ...(response?.seo?.issues || []),
+            ...elements, // Add scanned elements as issues
+          ];
+
+          // Generate AI fixes for all issues during analysis
+          if (allIssues.length > 0) {
+            const aiFixesResponse = await fetch('/api/ai-fixes', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ issues: allIssues }),
+            });
+
+            if (aiFixesResponse.ok) {
+              const { suggestions } = await aiFixesResponse.json();
+              setAiFixes(suggestions);
+            }
+          }
+
+          setElementIssues(Array.isArray(elements) ? elements : []);
         } catch (err) {
           console.error('Element scanning failed:', err);
           setElementIssues([]);
+          setAiFixes(null);
         }
       }
 
@@ -105,6 +145,7 @@ export const useAnalysis = () => {
         websiteUrl,
         scanStats,
         scannedElements,
+        cachedAiFixes: aiFixes, // Pass the cached AI fixes
       },
     });
   };
@@ -118,6 +159,7 @@ export const useAnalysis = () => {
     scanStats,
     scannedElements,
     elementIssues,
+    aiFixes,
     runAnalysis,
     navigateToAiFix,
   };

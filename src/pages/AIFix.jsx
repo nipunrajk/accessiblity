@@ -8,12 +8,14 @@ import jsPDF from 'jspdf';
 function AIFix() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { issues, websiteUrl, scanStats, scannedElements } = location.state || {
-    issues: [],
-    websiteUrl: '',
-    scanStats: { pagesScanned: 0, scannedUrls: [] },
-    scannedElements: [],
-  };
+  const { issues, websiteUrl, scanStats, scannedElements, cachedAiFixes } =
+    location.state || {
+      issues: [],
+      websiteUrl: '',
+      scanStats: { pagesScanned: 0, scannedUrls: [] },
+      scannedElements: [],
+      cachedAiFixes: null,
+    };
 
   const hasAIAvailable = isAIAvailable();
 
@@ -31,18 +33,36 @@ function AIFix() {
   const [successMessage, setSuccessMessage] = useState('');
   const [fixResults, setFixResults] = useState(null);
 
-  // Step 1: Trigger Fix Suggestions (only if AI is available)
+  // Step 1: Use cached AI fixes or fetch new ones
   useEffect(() => {
     const fetchFixSuggestions = async () => {
       if (!hasAIAvailable) {
         return; // Skip AI suggestions if not available
       }
 
+      // Use cached AI fixes if available
+      if (cachedAiFixes) {
+        console.log('✅ Using cached AI fixes:', cachedAiFixes);
+        console.log(
+          '✅ Number of issues with AI fixes:',
+          Object.keys(cachedAiFixes).length
+        );
+        setFixSuggestions(cachedAiFixes);
+        // Show a brief success message that cached data is being used
+        setSuccessMessage('Using cached AI analysis results');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
+
+      // Fallback: fetch new AI fixes if cache is missing
       try {
         setError(null);
         setLoadingStates((prev) => ({ ...prev, suggestions: true }));
+        console.log('🔄 Fetching new AI fixes for issues:', issues);
         const suggestions = await getFixSuggestions(issues);
         setFixSuggestions(suggestions);
+        setSuccessMessage('Generated fresh AI recommendations');
+        setTimeout(() => setSuccessMessage(''), 3000);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -53,7 +73,7 @@ function AIFix() {
     if (issues.length > 0) {
       fetchFixSuggestions();
     }
-  }, [issues, hasAIAvailable]);
+  }, [issues, hasAIAvailable, cachedAiFixes]);
 
   // Group issues by DOM element
   const groupedIssues = issues.reduce((acc, issue) => {
@@ -617,6 +637,121 @@ function AIFix() {
                             </div>
                           </div>
                         ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* All Issues with AI Fixes */}
+                {hasAIAvailable && Object.keys(fixSuggestions).length > 0 && (
+                  <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'>
+                    <h2 className='text-xl font-semibold text-gray-800 mb-4'>
+                      🤖 AI-Generated Fixes
+                    </h2>
+                    <div className='space-y-6'>
+                      {Object.entries(fixSuggestions).map(
+                        ([issueTitle, suggestions]) => (
+                          <div
+                            key={issueTitle}
+                            className='border-b border-gray-100 pb-6 last:border-b-0'
+                          >
+                            <h3 className='text-lg font-semibold text-gray-800 mb-2'>
+                              {issueTitle}
+                            </h3>
+
+                            {/* Find the original issue for context */}
+                            {(() => {
+                              const originalIssue = issues.find(
+                                (issue) => issue.title === issueTitle
+                              );
+                              return originalIssue ? (
+                                <div className='mb-4'>
+                                  <p className='text-gray-600 mb-2'>
+                                    {originalIssue.description}
+                                  </p>
+                                  {originalIssue.type && (
+                                    <span
+                                      className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                        originalIssue.type === 'performance'
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : originalIssue.type ===
+                                            'accessibility'
+                                          ? 'bg-green-100 text-green-800'
+                                          : originalIssue.type === 'seo'
+                                          ? 'bg-purple-100 text-purple-800'
+                                          : 'bg-gray-100 text-gray-800'
+                                      }`}
+                                    >
+                                      {originalIssue.type}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : null;
+                            })()}
+
+                            <div className='bg-gray-50 rounded-lg p-4 space-y-4'>
+                              <h4 className='font-medium text-gray-800 flex items-center gap-2'>
+                                <svg
+                                  className='w-5 h-5 text-blue-600'
+                                  fill='none'
+                                  stroke='currentColor'
+                                  viewBox='0 0 24 24'
+                                >
+                                  <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={2}
+                                    d='M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z'
+                                  />
+                                </svg>
+                                AI Recommendations ({suggestions.length})
+                              </h4>
+
+                              {suggestions.map((suggestion, sugIndex) => (
+                                <div
+                                  key={sugIndex}
+                                  className='bg-white rounded-lg p-4 border border-gray-200'
+                                >
+                                  <div className='mb-3'>
+                                    <h5 className='font-medium text-gray-800 mb-2'>
+                                      {suggestion.description}
+                                    </h5>
+                                    {suggestion.implementation && (
+                                      <p className='text-sm text-gray-600 mb-2'>
+                                        <strong>Implementation:</strong>{' '}
+                                        {suggestion.implementation}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {(suggestion.code ||
+                                    suggestion.codeExample) && (
+                                    <div className='bg-gray-50 p-3 rounded-lg mb-3'>
+                                      <span className='block text-sm text-gray-600 mb-2 font-medium'>
+                                        Code Example:
+                                      </span>
+                                      <pre className='text-black text-sm bg-gray-100 p-3 rounded overflow-x-auto'>
+                                        <code>
+                                          {suggestion.code ||
+                                            suggestion.codeExample}
+                                        </code>
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {(suggestion.impact ||
+                                    suggestion.expectedImpact) && (
+                                    <div className='text-sm text-green-700 bg-green-50 p-2 rounded'>
+                                      <strong>Expected Impact:</strong>{' '}
+                                      {suggestion.impact ||
+                                        suggestion.expectedImpact}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 )}

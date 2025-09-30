@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import analysisController from './controllers/analysisController.js';
+import aiController from './controllers/aiController.js';
 import repoModificationRoutes from './routes/repoModificationRoutes.js';
 
 dotenv.config();
@@ -21,6 +22,8 @@ app.use(express.json());
 // Routes
 app.post('/analyze', analysisController.analyzeWebsite);
 app.post('/api/scan-elements', analysisController.scanElements);
+app.post('/api/ai-analysis', aiController.getAnalysis);
+app.post('/api/ai-fixes', aiController.getFixes);
 app.use('/api/repo', repoModificationRoutes);
 
 // Error handling middleware
