@@ -3,19 +3,73 @@ import { useState, useEffect } from 'react';
 import { getFixSuggestions } from '../services/aiFix';
 import { scanWebsiteElements } from '../services/domScanner';
 import { isAIAvailable } from '../config/aiConfig';
+import { STORAGE_KEYS } from '../constants';
 import jsPDF from 'jspdf';
 
 function AIFix() {
   const location = useLocation();
   const navigate = useNavigate();
+  // Get data from location.state or fallback to localStorage
+  const getInitialData = () => {
+    if (location.state) {
+      return location.state;
+    }
+
+    // Fallback to localStorage if no state passed
+    try {
+      const savedResults = localStorage.getItem(STORAGE_KEYS.ANALYSIS_RESULTS);
+      const savedAiFixes = localStorage.getItem(STORAGE_KEYS.AI_FIXES);
+      const savedScanStats = localStorage.getItem(STORAGE_KEYS.SCAN_STATS);
+      const savedScannedElements = localStorage.getItem(
+        STORAGE_KEYS.SCANNED_ELEMENTS
+      );
+      const savedElementIssues = localStorage.getItem(
+        STORAGE_KEYS.ELEMENT_ISSUES
+      );
+      const savedWebsiteUrl = localStorage.getItem(STORAGE_KEYS.WEBSITE_URL);
+
+      const allIssues = [];
+
+      if (savedResults) {
+        const results = JSON.parse(savedResults);
+        allIssues.push(...(results?.performance?.issues || []));
+        allIssues.push(...(results?.accessibility?.issues || []));
+        allIssues.push(...(results?.bestPractices?.issues || []));
+        allIssues.push(...(results?.seo?.issues || []));
+      }
+
+      if (savedElementIssues) {
+        const elementIssues = JSON.parse(savedElementIssues);
+        if (Array.isArray(elementIssues)) {
+          allIssues.push(...elementIssues);
+        }
+      }
+
+      return {
+        issues: allIssues,
+        websiteUrl: savedWebsiteUrl || '',
+        scanStats: savedScanStats
+          ? JSON.parse(savedScanStats)
+          : { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
+        scannedElements: savedScannedElements
+          ? JSON.parse(savedScannedElements)
+          : [],
+        cachedAiFixes: savedAiFixes ? JSON.parse(savedAiFixes) : null,
+      };
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error);
+      return {
+        issues: [],
+        websiteUrl: '',
+        scanStats: { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
+        scannedElements: [],
+        cachedAiFixes: null,
+      };
+    }
+  };
+
   const { issues, websiteUrl, scanStats, scannedElements, cachedAiFixes } =
-    location.state || {
-      issues: [],
-      websiteUrl: '',
-      scanStats: { pagesScanned: 0, scannedUrls: [] },
-      scannedElements: [],
-      cachedAiFixes: null,
-    };
+    getInitialData();
 
   const hasAIAvailable = isAIAvailable();
 
@@ -309,6 +363,11 @@ function AIFix() {
                   ? `AI analysis and fixes for ${websiteUrl || 'website'}`
                   : `Manual review required for ${websiteUrl || 'website'}`}
               </p>
+              {cachedAiFixes && (
+                <p className='text-sm text-green-600 mt-1'>
+                  ✅ Using cached analysis results
+                </p>
+              )}
             </div>
           </div>
 

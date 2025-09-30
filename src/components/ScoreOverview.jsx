@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { getScoreColor } from '../utils/scoreUtils';
 
 function ScoreOverview({ results }) {
@@ -57,5 +58,22 @@ function ScoreOverview({ results }) {
     </div>
   );
 }
+
+ScoreOverview.propTypes = {
+  results: PropTypes.shape({
+    performance: PropTypes.shape({
+      score: PropTypes.number.isRequired,
+    }).isRequired,
+    accessibility: PropTypes.shape({
+      score: PropTypes.number.isRequired,
+    }).isRequired,
+    bestPractices: PropTypes.shape({
+      score: PropTypes.number.isRequired,
+    }).isRequired,
+    seo: PropTypes.shape({
+      score: PropTypes.number.isRequired,
+    }).isRequired,
+  }).isRequired,
+};
 
 export default ScoreOverview;

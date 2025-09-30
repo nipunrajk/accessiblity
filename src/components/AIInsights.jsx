@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 function AIInsights({ aiAnalysis, aiLoading }) {
   if (aiLoading) {
     return (
@@ -40,5 +42,15 @@ function AIInsights({ aiAnalysis, aiLoading }) {
     </div>
   );
 }
+
+AIInsights.propTypes = {
+  aiAnalysis: PropTypes.string,
+  aiLoading: PropTypes.bool,
+};
+
+AIInsights.defaultProps = {
+  aiAnalysis: null,
+  aiLoading: false,
+};
 
 export default AIInsights;

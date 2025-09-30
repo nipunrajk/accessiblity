@@ -1,37 +1,28 @@
+import {
+  SCORE_THRESHOLDS,
+  SCORE_COLORS,
+  IMPACT_THRESHOLDS,
+  IMPACT_LEVELS,
+  ISSUE_CATEGORIES,
+} from '../constants';
+
 export const getScoreColor = (score) => {
-  if (typeof score !== 'number' || isNaN(score)) return '#ef4444';
-  return score >= 90 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  if (typeof score !== 'number' || isNaN(score)) return SCORE_COLORS.POOR;
+
+  if (score >= SCORE_THRESHOLDS.EXCELLENT) return SCORE_COLORS.EXCELLENT;
+  if (score >= SCORE_THRESHOLDS.GOOD) return SCORE_COLORS.GOOD;
+  return SCORE_COLORS.POOR;
 };
 
 export const getImpactLabel = (impact, type) => {
   const impactNum = parseFloat(impact);
-  const thresholds = {
-    performance: {
-      critical: 25,
-      high: 15,
-      medium: 8,
-    },
-    accessibility: {
-      critical: 15,
-      high: 10,
-      medium: 5,
-    },
-    'best-practices': {
-      critical: 20,
-      high: 12,
-      medium: 6,
-    },
-    seo: {
-      critical: 18,
-      high: 10,
-      medium: 5,
-    },
-  };
+  const categoryThresholds =
+    IMPACT_THRESHOLDS[type] || IMPACT_THRESHOLDS[ISSUE_CATEGORIES.PERFORMANCE];
 
-  const categoryThresholds = thresholds[type] || thresholds.performance;
-  if (impactNum >= categoryThresholds.critical) return 'Critical';
-  if (impactNum >= categoryThresholds.high) return 'High';
-  if (impactNum >= categoryThresholds.medium) return 'Medium';
+  if (impactNum >= categoryThresholds[IMPACT_LEVELS.CRITICAL])
+    return 'Critical';
+  if (impactNum >= categoryThresholds[IMPACT_LEVELS.HIGH]) return 'High';
+  if (impactNum >= categoryThresholds[IMPACT_LEVELS.MEDIUM]) return 'Medium';
   return 'Low';
 };
 

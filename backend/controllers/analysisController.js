@@ -1,13 +1,13 @@
 import lighthouseService from '../services/lighthouseService.js';
 import puppeteer from 'puppeteer';
+import { validateUrl } from '../utils/validation.js';
 
 class AnalysisController {
   async analyzeWebsite(req, res) {
     const { url } = req.body;
 
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
-    }
+    // Validate URL
+    const validatedUrl = validateUrl(url);
 
     // Set up SSE headers
     res.writeHead(200, {
@@ -22,7 +22,7 @@ class AnalysisController {
       };
 
       const scanResults = await lighthouseService.scanWebsite(
-        url,
+        validatedUrl,
         sendProgress
       );
 

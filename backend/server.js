@@ -3,7 +3,14 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import analysisController from './controllers/analysisController.js';
 import aiController from './controllers/aiController.js';
+import {
+  connectGitHub,
+  getGitHubConfig,
+} from './controllers/githubController.js';
+import { analyzeRepository } from './controllers/repoAnalysisController.js';
+import { applyAccessibilityFixes } from './controllers/accessibilityFixController.js';
 import repoModificationRoutes from './routes/repoModificationRoutes.js';
+import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
 
@@ -17,21 +24,59 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
 
-// Routes
-app.post('/analyze', analysisController.analyzeWebsite);
-app.post('/api/scan-elements', analysisController.scanElements);
-app.post('/api/ai-analysis', aiController.getAnalysis);
-app.post('/api/ai-fixes', aiController.getFixes);
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// Routes with async error handling
+app.post('/analyze', asyncHandler(analysisController.analyzeWebsite));
+app.post('/api/scan-elements', asyncHandler(analysisController.scanElements));
+app.post('/api/ai-analysis', asyncHandler(aiController.getAnalysis));
+app.post('/api/ai-fixes', asyncHandler(aiController.getFixes));
+app.post('/api/github/connect', asyncHandler(connectGitHub));
+app.get('/api/github/config', asyncHandler(getGitHubConfig));
+app.post('/api/analyze-repo', asyncHandler(analyzeRepository));
+app.post(
+  '/api/apply-accessibility-fixes',
+  asyncHandler(applyAccessibilityFixes)
+);
 app.use('/api/repo', repoModificationRoutes);
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.method} ${req.originalUrl} not found`,
+    code: 'ROUTE_NOT_FOUND',
+  });
+});
+
+// Global error handling middleware
+app.use(errorHandler);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  process.exit(0);
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(`🚀 FastFix server running at http://localhost:${port}`);
+  console.log(`📊 Health check available at http://localhost:${port}/health`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

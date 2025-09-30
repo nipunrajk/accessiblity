@@ -1,23 +1,24 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import apiService from './api';
+import { ERROR_MESSAGES } from '../constants';
 
 export async function runLighthouseAnalysis(url, onProgress) {
   try {
-    const response = await fetch(`${API_URL}/analyze`, {
-      method: "POST",
+    const response = await apiService.request('/analyze', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
       },
       body: JSON.stringify({ url }),
     });
 
     if (!response.ok) {
-      throw new Error("Failed to analyze website");
+      throw new Error(ERROR_MESSAGES.ANALYSIS_FAILED);
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = ""; // Buffer to handle incomplete chunks
+    let buffer = ''; // Buffer to handle incomplete chunks
 
     while (true) {
       const { value, done } = await reader.read();
@@ -26,28 +27,28 @@ export async function runLighthouseAnalysis(url, onProgress) {
       buffer += decoder.decode(value, { stream: true });
 
       // Split on double newlines and process complete messages
-      const lines = buffer.split("\n\n");
+      const lines = buffer.split('\n\n');
       // Keep the last potentially incomplete chunk in the buffer
-      buffer = lines.pop() || "";
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (line.trim() && line.startsWith("data: ")) {
+        if (line.trim() && line.startsWith('data: ')) {
           try {
             const jsonStr = line.slice(6).trim();
 
             // Debug logging
-            console.log("Received SSE data length:", jsonStr.length);
+            console.log('Received SSE data length:', jsonStr.length);
             if (jsonStr.length > 1000) {
-              console.log("Start of data:", jsonStr.substring(0, 100));
+              console.log('Start of data:', jsonStr.substring(0, 100));
               console.log(
-                "End of data:",
+                'End of data:',
                 jsonStr.substring(jsonStr.length - 100)
               );
             }
 
             // Validate JSON structure
-            if (!jsonStr.startsWith("{") || !jsonStr.endsWith("}")) {
-              console.error("Malformed JSON structure:", {
+            if (!jsonStr.startsWith('{') || !jsonStr.endsWith('}')) {
+              console.error('Malformed JSON structure:', {
                 starts_with: jsonStr.substring(0, 1),
                 ends_with: jsonStr.substring(jsonStr.length - 1),
                 length: jsonStr.length,
@@ -93,13 +94,13 @@ export async function runLighthouseAnalysis(url, onProgress) {
               onProgress(data);
             }
           } catch (e) {
-            console.error("Failed to parse SSE data:", e);
+            console.error('Failed to parse SSE data:', e);
             if (e instanceof SyntaxError) {
               const jsonStr = line.slice(6);
               const errorPos = e.message.match(/position (\d+)/)?.[1];
               const pos = parseInt(errorPos) || 0;
 
-              console.error("Error details:", {
+              console.error('Error details:', {
                 message: e.message,
                 position: pos,
                 totalLength: jsonStr.length,
@@ -118,7 +119,7 @@ export async function runLighthouseAnalysis(url, onProgress) {
       }
     }
   } catch (error) {
-    console.error("Lighthouse analysis failed:", error);
+    console.error('Lighthouse analysis failed:', error);
     throw new Error(`Failed to analyze website: ${error.message}`);
   }
 }

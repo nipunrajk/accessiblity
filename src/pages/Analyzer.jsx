@@ -19,8 +19,10 @@ function Analyzer() {
     aiAnalysis,
     aiLoading,
     scanStats,
+    websiteUrl,
     runAnalysis,
     navigateToAiFix,
+    clearAnalysis,
   } = useAnalysis();
 
   // Check if AI is available
@@ -106,27 +108,56 @@ function Analyzer() {
               </div>
             )}
 
-            {/* Action Button */}
-            <div className='text-center'>
-              <button
-                onClick={() => navigateToAiFix()}
-                className='inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors'
-              >
-                <svg
-                  className='w-5 h-5'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
+            {/* Action Buttons */}
+            <div className='text-center space-y-4'>
+              <div className='flex flex-col sm:flex-row gap-4 justify-center items-center'>
+                <button
+                  onClick={() => navigateToAiFix()}
+                  className='inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors'
                 >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M13 10V3L4 14h7v7l9-11h-7z'
-                  />
-                </svg>
-                {hasAIAvailable ? 'Get AI Fixes' : 'View Issues'}
-              </button>
+                  <svg
+                    className='w-5 h-5'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M13 10V3L4 14h7v7l9-11h-7z'
+                    />
+                  </svg>
+                  {hasAIAvailable ? 'Get AI Fixes' : 'View Issues'}
+                </button>
+
+                <button
+                  onClick={clearAnalysis}
+                  className='inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors'
+                >
+                  <svg
+                    className='w-5 h-5'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M12 4v16m8-8H4'
+                    />
+                  </svg>
+                  New Analysis
+                </button>
+              </div>
+
+              {websiteUrl && (
+                <p className='text-sm text-gray-500'>
+                  Current analysis:{' '}
+                  <span className='font-medium'>{websiteUrl}</span>
+                </p>
+              )}
             </div>
 
             {/* Detailed Metrics */}

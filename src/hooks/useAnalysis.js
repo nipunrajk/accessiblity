@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { runLighthouseAnalysis } from '../services/lighthouse';
 import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
-
 import { isAIAvailable } from '../config/aiConfig';
+import { STORAGE_KEYS, API_CONFIG } from '../constants';
 
 export const useAnalysis = () => {
   const [loading, setLoading] = useState(false);
@@ -20,31 +20,112 @@ export const useAnalysis = () => {
   const [scannedElements, setScannedElements] = useState([]);
   const [elementIssues, setElementIssues] = useState([]);
   const [aiFixes, setAiFixes] = useState(null);
+  const [websiteUrl, setWebsiteUrl] = useState('');
 
   const navigate = useNavigate();
 
-  const runAnalysis = async (websiteUrl) => {
+  // Helper function to clear all persisted data
+  const clearPersistedData = () => {
+    Object.values(STORAGE_KEYS).forEach((key) => {
+      localStorage.removeItem(key);
+    });
+  };
+
+  // Load persisted data on component mount
+  useEffect(() => {
+    const loadPersistedData = () => {
+      try {
+        // Check if user is coming from a fresh login/signup
+        // If they're on the base /analyzer route (not /analyze/:id), clear previous data
+        const currentPath = window.location.pathname;
+        const isBaseAnalyzerRoute = currentPath === '/analyzer';
+
+        if (isBaseAnalyzerRoute) {
+          // User is on the main analyzer page, start fresh
+          clearPersistedData();
+          return;
+        }
+
+        // Only load persisted data if user is on a specific analysis route (/analyze/:id)
+        const savedResults = localStorage.getItem(
+          STORAGE_KEYS.ANALYSIS_RESULTS
+        );
+        const savedAiAnalysis = localStorage.getItem(STORAGE_KEYS.AI_ANALYSIS);
+        const savedAiFixes = localStorage.getItem(STORAGE_KEYS.AI_FIXES);
+        const savedScanStats = localStorage.getItem(STORAGE_KEYS.SCAN_STATS);
+        const savedScannedElements = localStorage.getItem(
+          STORAGE_KEYS.SCANNED_ELEMENTS
+        );
+        const savedElementIssues = localStorage.getItem(
+          STORAGE_KEYS.ELEMENT_ISSUES
+        );
+        const savedWebsiteUrl = localStorage.getItem(STORAGE_KEYS.WEBSITE_URL);
+
+        if (savedResults) setResults(JSON.parse(savedResults));
+        if (savedAiAnalysis) setAiAnalysis(JSON.parse(savedAiAnalysis));
+        if (savedAiFixes) setAiFixes(JSON.parse(savedAiFixes));
+        if (savedScanStats) setScanStats(JSON.parse(savedScanStats));
+        if (savedScannedElements)
+          setScannedElements(JSON.parse(savedScannedElements));
+        if (savedElementIssues)
+          setElementIssues(JSON.parse(savedElementIssues));
+        if (savedWebsiteUrl) setWebsiteUrl(savedWebsiteUrl);
+      } catch (error) {
+        console.error('Error loading persisted data:', error);
+        // Clear corrupted data
+        clearPersistedData();
+      }
+    };
+
+    loadPersistedData();
+  }, []);
+
+  // Helper function to persist data
+  const persistData = (key, data) => {
+    try {
+      if (data !== null && data !== undefined) {
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    } catch (error) {
+      console.error(`Error persisting ${key}:`, error);
+    }
+  };
+
+  const runAnalysis = async (url) => {
     setLoading(true);
     setError(null);
+
+    // Clear previous data
     setResults(null);
     setAiAnalysis(null);
     setAiFixes(null);
     setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
+    setWebsiteUrl(url);
+
+    // Clear persisted data for new analysis
+    clearPersistedData();
+
+    // Persist the new website URL
+    localStorage.setItem(STORAGE_KEYS.WEBSITE_URL, url);
 
     try {
       const analysis = { id: Date.now().toString() };
 
       // Run Lighthouse analysis
-      const response = await runLighthouseAnalysis(websiteUrl, (progress) => {
+      const response = await runLighthouseAnalysis(url, (progress) => {
         setScanStats(progress);
+        persistData(STORAGE_KEYS.SCAN_STATS, progress);
       });
 
-      setResults({
+      const analysisResults = {
         performance: response.performance,
         accessibility: response.accessibility,
         bestPractices: response.bestPractices,
         seo: response.seo,
-      });
+      };
+
+      setResults(analysisResults);
+      persistData(STORAGE_KEYS.ANALYSIS_RESULTS, analysisResults);
 
       // Generate AI analysis using backend endpoint
       const hasAI = isAIAvailable();
@@ -62,6 +143,7 @@ export const useAnalysis = () => {
           if (aiResponse.ok) {
             const { analysis } = await aiResponse.json();
             setAiAnalysis(analysis);
+            persistData(STORAGE_KEYS.AI_ANALYSIS, analysis);
           } else {
             console.error('AI Analysis failed:', aiResponse.statusText);
             setAiAnalysis(null);
@@ -76,8 +158,9 @@ export const useAnalysis = () => {
       // Scan elements and generate AI fixes if AI is available
       if (hasAI) {
         try {
-          const { elements } = await scanWebsiteElements(websiteUrl);
+          const { elements } = await scanWebsiteElements(url);
           setScannedElements(elements);
+          persistData(STORAGE_KEYS.SCANNED_ELEMENTS, elements);
 
           // Get all issues for AI fixes
           const allIssues = [
@@ -101,10 +184,13 @@ export const useAnalysis = () => {
             if (aiFixesResponse.ok) {
               const { suggestions } = await aiFixesResponse.json();
               setAiFixes(suggestions);
+              persistData(STORAGE_KEYS.AI_FIXES, suggestions);
             }
           }
 
-          setElementIssues(Array.isArray(elements) ? elements : []);
+          const elementIssuesData = Array.isArray(elements) ? elements : [];
+          setElementIssues(elementIssuesData);
+          persistData(STORAGE_KEYS.ELEMENT_ISSUES, elementIssuesData);
         } catch (err) {
           console.error('Element scanning failed:', err);
           setElementIssues([]);
@@ -120,6 +206,7 @@ export const useAnalysis = () => {
       };
 
       setScanStats(finalScanStats);
+      persistData(STORAGE_KEYS.SCAN_STATS, finalScanStats);
       navigate(`/analyze/${analysis.id}`);
     } catch (err) {
       setError(err.message);
@@ -130,7 +217,8 @@ export const useAnalysis = () => {
     }
   };
 
-  const navigateToAiFix = (websiteUrl) => {
+  const navigateToAiFix = (url) => {
+    const currentUrl = url || websiteUrl;
     const allIssues = [
       ...(results?.performance?.issues || []),
       ...(results?.accessibility?.issues || []),
@@ -142,12 +230,25 @@ export const useAnalysis = () => {
     navigate('/ai-fix', {
       state: {
         issues: allIssues,
-        websiteUrl,
+        websiteUrl: currentUrl,
         scanStats,
         scannedElements,
         cachedAiFixes: aiFixes, // Pass the cached AI fixes
       },
     });
+  };
+
+  // Function to clear all analysis data
+  const clearAnalysis = () => {
+    setResults(null);
+    setAiAnalysis(null);
+    setAiFixes(null);
+    setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
+    setScannedElements([]);
+    setElementIssues([]);
+    setWebsiteUrl('');
+    setError(null);
+    clearPersistedData();
   };
 
   return {
@@ -160,7 +261,9 @@ export const useAnalysis = () => {
     scannedElements,
     elementIssues,
     aiFixes,
+    websiteUrl,
     runAnalysis,
     navigateToAiFix,
+    clearAnalysis,
   };
 };
