@@ -5,6 +5,8 @@ import { getAIAnalysis } from '../services/langchain';
 import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
 
+import { isAIAvailable } from '../config/aiConfig';
+
 export const useAnalysis = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -43,20 +45,31 @@ export const useAnalysis = () => {
         seo: response.seo,
       });
 
-      // Generate AI analysis
-      setAiLoading(true);
-      const aiAnalysisResult = await getAIAnalysis(response);
-      setAiAnalysis(aiAnalysisResult);
+      // Generate AI analysis only if AI is available
+      const hasAI = isAIAvailable();
+      if (hasAI) {
+        setAiLoading(true);
+        try {
+          const aiAnalysisResult = await getAIAnalysis(response);
+          setAiAnalysis(aiAnalysisResult);
+        } catch (aiError) {
+          console.error('AI Analysis failed:', aiError);
+          // Don't fail the entire analysis if AI fails
+          setAiAnalysis(null);
+        }
+      }
 
-      // Scan elements
-      try {
-        const { elements } = await scanWebsiteElements(websiteUrl);
-        setScannedElements(elements);
-        const suggestions = await getFixSuggestions(elements);
-        setElementIssues(Array.isArray(suggestions) ? suggestions : []);
-      } catch (err) {
-        console.error('Element scanning failed:', err);
-        setElementIssues([]);
+      // Scan elements only if AI is available
+      if (hasAI) {
+        try {
+          const { elements } = await scanWebsiteElements(websiteUrl);
+          setScannedElements(elements);
+          const suggestions = await getFixSuggestions(elements);
+          setElementIssues(Array.isArray(suggestions) ? suggestions : []);
+        } catch (err) {
+          console.error('Element scanning failed:', err);
+          setElementIssues([]);
+        }
       }
 
       const finalScanStats = {

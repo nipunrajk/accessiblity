@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useAnalysis } from '../hooks/useAnalysis';
+import { isAIAvailable } from '../config/aiConfig';
 import Header from '../components/Header';
 import AnalysisForm from '../components/AnalysisForm';
 import LoadingState from '../components/LoadingState';
@@ -21,6 +22,9 @@ function Analyzer() {
     runAnalysis,
     navigateToAiFix,
   } = useAnalysis();
+
+  // Check if AI is available
+  const hasAIAvailable = isAIAvailable();
 
   // TODO: Implement loadAnalysis for existing analysis IDs if needed
 
@@ -52,8 +56,55 @@ function Analyzer() {
             {/* Score Overview */}
             <ScoreOverview results={results} />
 
-            {/* AI Insights */}
-            <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
+            {/* AI Insights - Only show if AI is available */}
+            {hasAIAvailable ? (
+              <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
+            ) : (
+              <div className='bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8'>
+                <div className='flex items-center gap-4 mb-4'>
+                  <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'>
+                    <svg
+                      className='w-5 h-5 text-blue-600'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M13 10V3L4 14h7v7l9-11h-7z'
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className='text-lg font-semibold text-gray-900'>
+                      Want AI-Powered Insights?
+                    </h3>
+                    <p className='text-gray-600 text-sm'>
+                      Configure AI in{' '}
+                      <code className='bg-gray-200 px-1 rounded'>
+                        src/config/aiConfig.js
+                      </code>{' '}
+                      to unlock advanced analysis
+                    </p>
+                  </div>
+                </div>
+                <div className='text-sm text-gray-600'>
+                  <p className='mb-2'>
+                    <strong>Quick setup:</strong> Add OpenRouter API key for{' '}
+                    <strong>xAI Grok 4 Fast</strong> (free & fastest)
+                  </p>
+                  <p className='mb-2'>AI analysis includes:</p>
+                  <ul className='list-disc list-inside space-y-1 text-gray-600'>
+                    <li>Detailed performance insights</li>
+                    <li>Specific optimization recommendations</li>
+                    <li>Accessibility improvement suggestions</li>
+                    <li>SEO enhancement tips</li>
+                  </ul>
+                </div>
+              </div>
+            )}
 
             {/* Action Button */}
             <div className='text-center'>
@@ -74,7 +125,7 @@ function Analyzer() {
                     d='M13 10V3L4 14h7v7l9-11h-7z'
                   />
                 </svg>
-                Get AI Fixes
+                {hasAIAvailable ? 'Get AI Fixes' : 'View Issues'}
               </button>
             </div>
 

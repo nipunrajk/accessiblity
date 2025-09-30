@@ -70,6 +70,13 @@ Keep recommendations technical, specific, and focused on WCAG 2.1 compliance.
 
 export async function getAIAnalysis(results) {
   try {
+    // Check if AI provider is available
+    if (!aiProvider.isAvailable()) {
+      throw new Error(
+        'No AI provider configured. Check src/config/aiConfig.js'
+      );
+    }
+
     const input = {
       performance: Math.round(results.performance.score),
       accessibility: Math.round(results.accessibility.score),
@@ -83,7 +90,8 @@ export async function getAIAnalysis(results) {
       tti: results.performance.metrics?.tti?.displayValue || 'N/A',
     };
 
-    const response = await aiProvider.invoke(analysisPrompt, input);
+    const formattedPrompt = await analysisPrompt.format(input);
+    const response = await aiProvider.invoke(formattedPrompt);
     return response;
   } catch (error) {
     console.error('AI Analysis failed:', error);
@@ -100,7 +108,8 @@ export async function getIssueRecommendations(issue) {
       impact: issue.impact,
     };
 
-    const content = await aiProvider.invoke(issueRecommendationPrompt, input);
+    const formattedPrompt = await issueRecommendationPrompt.format(input);
+    const content = await aiProvider.invoke(formattedPrompt);
 
     if (!content) {
       throw new Error('No content in AI response');

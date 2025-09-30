@@ -1,158 +1,244 @@
-import { OpenAI } from '@langchain/openai';
-import { ChatAnthropic } from '@langchain/anthropic';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { PromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence } from '@langchain/core/runnables';
+import { getActiveAIProvider, isAIAvailable } from '../config/aiConfig.js';
 
-// AI Provider Configuration
-const AI_PROVIDER = import.meta.env.VITE_AI_PROVIDER || 'openai';
-
-// API Keys
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-const OLLAMA_BASE_URL =
-  import.meta.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434';
-
-// Models
-const OPENAI_MODEL =
-  import.meta.env.VITE_OPENAI_MODEL || 'gpt-3.5-turbo-instruct';
-const ANTHROPIC_MODEL =
-  import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-3-sonnet-20240229';
-const GOOGLE_MODEL = import.meta.env.VITE_GOOGLE_MODEL || 'gemini-pro';
-const GROQ_MODEL = import.meta.env.VITE_GROQ_MODEL || 'mixtral-8x7b-32768';
-const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || 'llama2';
-
-class AIProviderService {
+class AIProvider {
   constructor() {
-    this.model = this.initializeModel();
+    this.provider = null;
+    this.initialize();
   }
 
-  initializeModel() {
-    switch (AI_PROVIDER.toLowerCase()) {
-      case 'openai':
-        if (!OPENAI_API_KEY) {
-          throw new Error(
-            'OpenAI API key is not set. Please check your .env file.'
-          );
-        }
-        return new OpenAI({
-          openAIApiKey: OPENAI_API_KEY,
-          modelName: OPENAI_MODEL,
-          temperature: 0.7,
-        });
-
-      case 'anthropic':
-        if (!ANTHROPIC_API_KEY) {
-          throw new Error(
-            'Anthropic API key is not set. Please check your .env file.'
-          );
-        }
-        return new ChatAnthropic({
-          anthropicApiKey: ANTHROPIC_API_KEY,
-          modelName: ANTHROPIC_MODEL,
-          temperature: 0.7,
-        });
-
-      case 'google':
-        if (!GOOGLE_API_KEY) {
-          throw new Error(
-            'Google API key is not set. Please check your .env file.'
-          );
-        }
-        return new ChatGoogleGenerativeAI({
-          apiKey: GOOGLE_API_KEY,
-          modelName: GOOGLE_MODEL,
-          temperature: 0.7,
-        });
-
-      case 'groq':
-        if (!GROQ_API_KEY) {
-          throw new Error(
-            'Groq API key is not set. Please check your .env file.'
-          );
-        }
-        // Groq uses OpenAI-compatible API
-        return new OpenAI({
-          openAIApiKey: GROQ_API_KEY,
-          modelName: GROQ_MODEL,
-          temperature: 0.7,
-          configuration: {
-            baseURL: 'https://api.groq.com/openai/v1',
-          },
-        });
-
-      case 'ollama':
-        return new OpenAI({
-          openAIApiKey: 'ollama', // Ollama doesn't require API key
-          modelName: OLLAMA_MODEL,
-          temperature: 0.7,
-          configuration: {
-            baseURL: `${OLLAMA_BASE_URL}/v1`,
-          },
-        });
-
-      default:
-        console.warn(
-          `Unknown AI provider: ${AI_PROVIDER}. Falling back to OpenAI.`
-        );
-        return new OpenAI({
-          openAIApiKey: OPENAI_API_KEY,
-          modelName: OPENAI_MODEL,
-          temperature: 0.7,
-        });
+  initialize() {
+    this.provider = getActiveAIProvider();
+    if (this.provider) {
+      console.log(
+        `🤖 AI Provider: ${this.provider.name} (${this.provider.model})`
+      );
+      console.log('✅ AI-powered analysis enabled');
+    } else {
+      console.log(
+        'ℹ️  AI not configured. Check src/config/aiConfig.js for setup instructions.'
+      );
+      console.log(
+        '💡 Quick start: Set openrouter.enabled = true for free AI models'
+      );
     }
   }
 
-  async invoke(prompt, input) {
-    try {
-      const formattedPrompt = await prompt.format(input);
-      const response = await this.model.invoke(formattedPrompt);
+  isAvailable() {
+    return isAIAvailable();
+  }
 
-      // Handle different response formats
-      if (typeof response === 'string') {
-        return response;
-      } else if (response?.content) {
-        return response.content;
-      } else if (response?.choices?.[0]?.message?.content) {
-        return response.choices[0].message.content;
-      } else {
-        return response;
+  async invoke(prompt) {
+    if (!this.provider) {
+      throw new Error('No AI provider configured');
+    }
+
+    try {
+      switch (this.provider.name) {
+        case 'openai':
+          return await this.invokeOpenAI(prompt);
+        case 'anthropic':
+          return await this.invokeAnthropic(prompt);
+        case 'openrouter':
+          return await this.invokeOpenRouter(prompt);
+        case 'google':
+          return await this.invokeGoogle(prompt);
+        case 'groq':
+          return await this.invokeGroq(prompt);
+        case 'ollama':
+          return await this.invokeOllama(prompt);
+        default:
+          throw new Error(`Unsupported provider: ${this.provider.name}`);
       }
     } catch (error) {
-      console.error(`AI Provider (${AI_PROVIDER}) error:`, error);
-      throw new Error(`Failed to get AI response: ${error.message}`);
+      console.error(`AI Provider Error (${this.provider.name}):`, error);
+      throw error;
     }
+  }
+
+  async invokeOpenAI(prompt) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.provider.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  async invokeAnthropic(prompt) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.provider.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  }
+
+  async invokeOpenRouter(prompt) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'HTTP-Referer': window.location.origin,
+      'X-Title': 'FastFix Website Analyzer',
+    };
+
+    // Add API key if available (for paid models)
+    if (this.provider.apiKey) {
+      headers['Authorization'] = `Bearer ${this.provider.apiKey}`;
+    }
+
+    const response = await fetch(`${this.provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: this.provider.model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenRouter API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        model: this.provider.model,
+        hasApiKey: !!this.provider.apiKey,
+        errorBody: errorText,
+      });
+      throw new Error(
+        `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Unexpected OpenRouter response format:', data);
+      throw new Error('Invalid response format from OpenRouter');
+    }
+
+    return data.choices[0].message.content;
+  }
+
+  async invokeGoogle(prompt) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${this.provider.model}:generateContent?key=${this.provider.apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.7,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Google API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  }
+
+  async invokeGroq(prompt) {
+    const response = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.provider.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.provider.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1000,
+          temperature: 0.7,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  async invokeOllama(prompt) {
+    const response = await fetch(`${this.provider.baseUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.provider.model,
+        prompt: prompt,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.response;
   }
 
   getProviderInfo() {
-    return {
-      provider: AI_PROVIDER,
-      model: this.getModelName(),
-      isLocal: AI_PROVIDER === 'ollama',
-    };
-  }
-
-  getModelName() {
-    switch (AI_PROVIDER.toLowerCase()) {
-      case 'openai':
-        return OPENAI_MODEL;
-      case 'anthropic':
-        return ANTHROPIC_MODEL;
-      case 'google':
-        return GOOGLE_MODEL;
-      case 'groq':
-        return GROQ_MODEL;
-      case 'ollama':
-        return OLLAMA_MODEL;
-      default:
-        return 'unknown';
-    }
+    return this.provider
+      ? {
+          name: this.provider.name,
+          model: this.provider.model,
+          available: true,
+        }
+      : {
+          name: 'None',
+          model: 'Not configured',
+          available: false,
+        };
   }
 }
 
-// Create singleton instance
-const aiProvider = new AIProviderService();
-
-export default aiProvider;
+// Export singleton instance
+export default new AIProvider();

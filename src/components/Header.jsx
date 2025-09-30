@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import AIProviderSettings from './AIProviderSettings';
 
 function Header() {
   const navigate = useNavigate();
@@ -15,10 +14,9 @@ function Header() {
             <span className='font-semibold text-gray-900'>FastFix</span>
           </div>
           <div className='flex items-center gap-4'>
-            <AIProviderSettings />
             <button
               onClick={() => navigate('/github-config')}
-              className='p-2 text-gray-600 hover:text-gray-900 transition-colors'
+              className='p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100'
               title='GitHub Integration'
             >
               <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 24 24'>

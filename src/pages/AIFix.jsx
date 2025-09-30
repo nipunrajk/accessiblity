@@ -1,36 +1,43 @@
-import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { getFixSuggestions } from "../services/aiFix";
-import { scanWebsiteElements } from "../services/domScanner";
-import jsPDF from "jspdf";
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getFixSuggestions } from '../services/aiFix';
+import { scanWebsiteElements } from '../services/domScanner';
+import { isAIAvailable } from '../config/aiConfig';
+import jsPDF from 'jspdf';
 
 function AIFix() {
   const location = useLocation();
   const navigate = useNavigate();
   const { issues, websiteUrl, scanStats, scannedElements } = location.state || {
     issues: [],
-    websiteUrl: "",
+    websiteUrl: '',
     scanStats: { pagesScanned: 0, scannedUrls: [] },
     scannedElements: [],
   };
 
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const hasAIAvailable = isAIAvailable();
+
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [fixSuggestions, setFixSuggestions] = useState({});
   const [loadingStates, setLoadingStates] = useState({});
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [githubDetails, setGithubDetails] = useState({
-    token: "",
-    owner: "",
-    repo: "",
+    token: '',
+    owner: '',
+    repo: '',
   });
   const [currentSuggestion, setCurrentSuggestion] = useState(null);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState('');
   const [fixResults, setFixResults] = useState(null);
 
-  // Step 1: Trigger Fix Suggestions
+  // Step 1: Trigger Fix Suggestions (only if AI is available)
   useEffect(() => {
     const fetchFixSuggestions = async () => {
+      if (!hasAIAvailable) {
+        return; // Skip AI suggestions if not available
+      }
+
       try {
         setError(null);
         setLoadingStates((prev) => ({ ...prev, suggestions: true }));
@@ -46,7 +53,7 @@ function AIFix() {
     if (issues.length > 0) {
       fetchFixSuggestions();
     }
-  }, [issues]);
+  }, [issues, hasAIAvailable]);
 
   // Group issues by DOM element
   const groupedIssues = issues.reduce((acc, issue) => {
@@ -71,7 +78,7 @@ function AIFix() {
 
   // Filter issues based on category
   const filteredElements =
-    selectedCategory === "all"
+    selectedCategory === 'all'
       ? Object.keys(groupedIssues)
       : Object.keys(groupedIssues).filter((selector) =>
           groupedIssues[selector].some(
@@ -81,16 +88,16 @@ function AIFix() {
 
   const getTypeColor = (type) => {
     switch (type) {
-      case "performance":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "accessibility":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "best-practices":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "seo":
-        return "bg-orange-100 text-orange-800 border-orange-200";
+      case 'performance':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'accessibility':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'best-practices':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'seo':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -100,7 +107,7 @@ function AIFix() {
 
     // Add title
     doc.setFontSize(16);
-    doc.text("Website Analysis Report", 20, yPos);
+    doc.text('Website Analysis Report', 20, yPos);
     yPos += 20;
 
     // Add scan statistics
@@ -114,7 +121,7 @@ function AIFix() {
 
     // Add issues and fixes
     doc.setFontSize(14);
-    doc.text("Issues and AI Fixes:", 20, yPos);
+    doc.text('Issues and AI Fixes:', 20, yPos);
     yPos += 10;
 
     issues.forEach((issue, index) => {
@@ -126,18 +133,18 @@ function AIFix() {
       doc.setFontSize(12);
       // Use title or description if available, fallback to a default message
       const issueTitle =
-        issue.title || issue.description || "Issue details not available";
+        issue.title || issue.description || 'Issue details not available';
       doc.text(`${index + 1}. Issue: ${issueTitle}`, 20, yPos);
       yPos += 10;
 
       // Add issue type and impact if available
       if (issue.type || issue.impact) {
         doc.setFontSize(10);
-        const typeText = issue.type ? `Type: ${issue.type}` : "";
+        const typeText = issue.type ? `Type: ${issue.type}` : '';
         const impactText = issue.impact
           ? `Impact: ${Math.round(issue.impact)}%`
-          : "";
-        const infoText = [typeText, impactText].filter(Boolean).join(" | ");
+          : '';
+        const infoText = [typeText, impactText].filter(Boolean).join(' | ');
         if (infoText) {
           doc.text(infoText, 30, yPos);
           yPos += 10;
@@ -149,11 +156,11 @@ function AIFix() {
         const suggestion = fixSuggestions[issue.title];
         doc.setFontSize(10);
         const suggestionText =
-          typeof suggestion === "string"
+          typeof suggestion === 'string'
             ? suggestion
             : Array.isArray(suggestion)
-            ? suggestion[0]?.description || "Fix suggestion available"
-            : suggestion.description || "Fix suggestion available";
+            ? suggestion[0]?.description || 'Fix suggestion available'
+            : suggestion.description || 'Fix suggestion available';
         doc.text(`AI Fix Suggestion: ${suggestionText}`, 30, yPos);
         yPos += 10;
       }
@@ -163,7 +170,7 @@ function AIFix() {
     });
 
     // Save the PDF
-    doc.save("website-analysis-report.pdf");
+    doc.save('website-analysis-report.pdf');
   };
 
   const handleApplyFix = (suggestion) => {
@@ -173,7 +180,7 @@ function AIFix() {
 
   const handleSubmitGithubDetails = async () => {
     if (!currentSuggestion) {
-      setError("No suggestion selected");
+      setError('No suggestion selected');
       return;
     }
 
@@ -191,12 +198,12 @@ function AIFix() {
       // Get all descriptions from the suggestions and join them with commas
       const suggestionsString = allSuggestionsForIssue
         .map((sug) => sug.description)
-        .join(", ");
+        .join(', ');
 
-      const response = await fetch("/api/repo/ai-optimize-specific", {
-        method: "POST",
+      const response = await fetch('/api/repo/ai-optimize-specific', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           githubToken: githubDetails.token,
@@ -207,11 +214,11 @@ function AIFix() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to apply fix");
+        throw new Error('Failed to apply fix');
       }
 
       const data = await response.json();
-      setSuccessMessage("Fix applied successfully!");
+      setSuccessMessage('Fix applied successfully!');
       setFixResults(data);
 
       // Open URLs in new tabs if available
@@ -221,8 +228,8 @@ function AIFix() {
 
         // Open PR URL
         if (url) {
-          console.log("opening url");
-          window.open(url, "_blank").focus();
+          console.log('opening url');
+          window.open(url, '_blank').focus();
         }
       }
 
@@ -256,7 +263,7 @@ function AIFix() {
         <div className='flex items-center justify-between mb-6'>
           <div className='flex items-center gap-4'>
             <button
-              onClick={() => navigate("/analyzer")}
+              onClick={() => navigate('/analyzer')}
               className='p-2 rounded-lg'
             >
               <svg
@@ -275,10 +282,12 @@ function AIFix() {
             </button>
             <div>
               <h1 className='text-2xl font-bold text-gray-800 text-left'>
-                DOM Element Analysis
+                {hasAIAvailable ? 'AI-Powered Fixes' : 'Issue Analysis'}
               </h1>
               <p className='text-gray-600 text-left'>
-                Analyzing {websiteUrl || "website"}
+                {hasAIAvailable
+                  ? `AI analysis and fixes for ${websiteUrl || 'website'}`
+                  : `Manual review required for ${websiteUrl || 'website'}`}
               </p>
             </div>
           </div>
@@ -382,7 +391,7 @@ function AIFix() {
                         Applying Fix...
                       </>
                     ) : (
-                      "Submit"
+                      'Submit'
                     )}
                   </button>
                 </div>
@@ -443,23 +452,23 @@ function AIFix() {
               </h2>
               <div className='space-y-2'>
                 <button
-                  onClick={() => setSelectedCategory("all")}
+                  onClick={() => setSelectedCategory('all')}
                   className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-none ${
-                    selectedCategory === "all"
-                      ? "bg-gray-800 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    selectedCategory === 'all'
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   All Categories
                 </button>
-                {["performance", "accessibility", "seo"].map((type) => (
+                {['performance', 'accessibility', 'seo'].map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedCategory(type)}
                     className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-none ${
                       selectedCategory === type
-                        ? "bg-gray-800 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        ? 'bg-gray-800 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -474,7 +483,7 @@ function AIFix() {
                 Issue Summary
               </h2>
               <div className='space-y-3'>
-                {["performance", "accessibility", "seo", "best-practices"].map(
+                {['performance', 'accessibility', 'seo', 'best-practices'].map(
                   (category) => {
                     const uniqueIssues = getUniqueIssues(issues);
                     const count = uniqueIssues.filter(
@@ -488,7 +497,7 @@ function AIFix() {
                       >
                         <div className='text-lg font-bold'>{count}</div>
                         <div className='text-sm'>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}{" "}
+                          {category.charAt(0).toUpperCase() + category.slice(1)}{' '}
                           Issues
                         </div>
                       </div>
@@ -512,10 +521,10 @@ function AIFix() {
                 {/* Meta Description Section */}
                 {scannedElements.filter(
                   (element) =>
-                    element.tag === "meta" &&
+                    element.tag === 'meta' &&
                     element.attributes.find(
                       (attr) =>
-                        attr.name === "name" && attr.value === "description"
+                        attr.name === 'name' && attr.value === 'description'
                     )
                 ).length === 0 && (
                   <div className='border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow'>
@@ -548,7 +557,7 @@ function AIFix() {
                         }
                       </code>
                       <p className='mt-2 text-sm text-gray-600'>
-                        Add this tag inside your {"<head>"} section with a
+                        Add this tag inside your {'<head>'} section with a
                         descriptive content that summarizes your page.
                       </p>
                     </div>
@@ -558,10 +567,10 @@ function AIFix() {
                 {/* Missing Alt Attributes Section */}
                 {scannedElements.filter(
                   (element) =>
-                    element.tag === "img" &&
-                    (!element.attributes.find((attr) => attr.name === "alt") ||
+                    element.tag === 'img' &&
+                    (!element.attributes.find((attr) => attr.name === 'alt') ||
                       element.attributes.find(
-                        (attr) => attr.name === "alt" && attr.value === ""
+                        (attr) => attr.name === 'alt' && attr.value === ''
                       ))
                 ).length > 0 && (
                   <div className='border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow'>
@@ -584,13 +593,13 @@ function AIFix() {
                       {scannedElements
                         .filter(
                           (element) =>
-                            element.tag === "img" &&
+                            element.tag === 'img' &&
                             (!element.attributes.find(
-                              (attr) => attr.name === "alt"
+                              (attr) => attr.name === 'alt'
                             ) ||
                               element.attributes.find(
                                 (attr) =>
-                                  attr.name === "alt" && attr.value === ""
+                                  attr.name === 'alt' && attr.value === ''
                               ))
                         )
                         .map((element, index) => (
@@ -601,10 +610,10 @@ function AIFix() {
                             <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded'>
                               {`<img ${element.attributes
                                 .map((attr) => `${attr.name}="${attr.value}"`)
-                                .join(" ")}>`}
+                                .join(' ')}>`}
                             </code>
                             <div className='mt-2 text-sm text-gray-600'>
-                              Found at: {element.location || "Unknown location"}
+                              Found at: {element.location || 'Unknown location'}
                             </div>
                           </div>
                         ))}
@@ -616,7 +625,7 @@ function AIFix() {
                 {filteredElements.map((selector, index) => {
                   const elementIssues = groupedIssues[selector].filter(
                     (issue) =>
-                      selectedCategory === "all" ||
+                      selectedCategory === 'all' ||
                       issue.type === selectedCategory
                   );
 
@@ -631,7 +640,7 @@ function AIFix() {
                           <code className='text-black bg-gray-100 px-3 py-1.5 rounded-lg text-sm font-mono whitespace-pre'>
                             {(() => {
                               const parts = selector
-                                .split(" > ")
+                                .split(' > ')
                                 .map((part) => {
                                   // Split by both . and # but keep the delimiters
                                   const segments = part.split(/([.#\[])/);
@@ -646,11 +655,11 @@ function AIFix() {
                                     const delimiter = segments[i];
                                     const value = segments[i + 1];
 
-                                    if (delimiter === ".") {
+                                    if (delimiter === '.') {
                                       classes.push(value);
-                                    } else if (delimiter === "#") {
+                                    } else if (delimiter === '#') {
                                       id = value;
-                                    } else if (delimiter === "[") {
+                                    } else if (delimiter === '[') {
                                       // Handle attribute selectors [attr="value"]
                                       const attrMatch = value.match(
                                         /([^=\]]+)(?:="([^"]*)")?\]/
@@ -659,7 +668,7 @@ function AIFix() {
                                         const [, attrName, attrValue] =
                                           attrMatch;
                                         otherAttributes[attrName] =
-                                          attrValue || "";
+                                          attrValue || '';
                                       }
                                     }
                                   }
@@ -669,9 +678,9 @@ function AIFix() {
                                     (issue) =>
                                       issue.element?.attributes?.some(
                                         (attr) =>
-                                          (attr.name === "class" &&
-                                            attr.value === classes.join(" ")) ||
-                                          (attr.name === "id" &&
+                                          (attr.name === 'class' &&
+                                            attr.value === classes.join(' ')) ||
+                                          (attr.name === 'id' &&
                                             attr.value === id)
                                       )
                                   );
@@ -680,8 +689,8 @@ function AIFix() {
                                     elementIssue.element.attributes.forEach(
                                       (attr) => {
                                         if (
-                                          attr.name !== "class" &&
-                                          attr.name !== "id"
+                                          attr.name !== 'class' &&
+                                          attr.name !== 'id'
                                         ) {
                                           otherAttributes[attr.name] =
                                             attr.value;
@@ -693,17 +702,17 @@ function AIFix() {
                                   return {
                                     tag,
                                     classes: classes.length
-                                      ? classes.join(" ")
+                                      ? classes.join(' ')
                                       : null,
                                     id,
                                     attributes: otherAttributes,
                                   };
                                 });
 
-                              let output = "";
+                              let output = '';
                               // Add opening tags with indentation
                               parts.forEach((part, index) => {
-                                const indent = " ".repeat(index * 2);
+                                const indent = ' '.repeat(index * 2);
                                 const attrs = [];
 
                                 if (part.id) attrs.push(`id="${part.id}"`);
@@ -718,14 +727,14 @@ function AIFix() {
                                 );
 
                                 const attributes = attrs.length
-                                  ? " " + attrs.join(" ")
-                                  : "";
+                                  ? ' ' + attrs.join(' ')
+                                  : '';
                                 output += `${indent}<${part.tag}${attributes}>\n`;
                               });
 
                               // Add closing tags with proper indentation
                               [...parts].reverse().forEach((part, index) => {
-                                const indent = " ".repeat(
+                                const indent = ' '.repeat(
                                   (parts.length - 1 - index) * 2
                                 );
                                 output += `${indent}</${part.tag}>\n`;
@@ -778,50 +787,107 @@ function AIFix() {
                               </p>
 
                               {/* Fix Suggestions */}
-                              {suggestions.length > 0 && (
-                                <div className='bg-gray-50 rounded-lg p-4 space-y-3 mt-4'>
-                                  <div className='flex items-center justify-between'>
-                                    <h4 className='font-medium text-gray-800'>
-                                      AI Fix Suggestions:
-                                    </h4>
-                                    <button
-                                      onClick={() =>
-                                        handleApplyFix(suggestions[0])
-                                      }
-                                      className='bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm'
-                                    >
-                                      Apply Fix
-                                    </button>
+                              {hasAIAvailable ? (
+                                suggestions.length > 0 ? (
+                                  <div className='bg-gray-50 rounded-lg p-4 space-y-3 mt-4'>
+                                    <div className='flex items-center justify-between'>
+                                      <h4 className='font-medium text-gray-800'>
+                                        AI Fix Suggestions:
+                                      </h4>
+                                      <button
+                                        onClick={() =>
+                                          handleApplyFix(suggestions[0])
+                                        }
+                                        className='bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm'
+                                      >
+                                        Apply Fix
+                                      </button>
+                                    </div>
+                                    {suggestions.map((suggestion, sugIndex) => (
+                                      <div
+                                        key={sugIndex}
+                                        className='bg-white rounded-lg p-4 border border-gray-200'
+                                      >
+                                        <div className='flex items-center justify-between mb-3'>
+                                          <p className='text-gray-700 font-medium'>
+                                            {suggestion.description}
+                                          </p>
+                                        </div>
+
+                                        {suggestion.code && (
+                                          <div className='bg-gray-50 p-3 rounded-lg mt-2'>
+                                            <span className='block text-sm text-gray-600 mb-1'>
+                                              Proposed Changes:
+                                            </span>
+                                            <pre className='text-black text-sm bg-gray-100 p-2 rounded overflow-x-auto'>
+                                              <code>{suggestion.code}</code>
+                                            </pre>
+                                          </div>
+                                        )}
+
+                                        {suggestion.impact && (
+                                          <div className='mt-2 text-sm text-gray-600'>
+                                            Expected Impact: {suggestion.impact}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                  {suggestions.map((suggestion, sugIndex) => (
-                                    <div
-                                      key={sugIndex}
-                                      className='bg-white rounded-lg p-4 border border-gray-200'
-                                    >
-                                      <div className='flex items-center justify-between mb-3'>
-                                        <p className='text-gray-700 font-medium'>
-                                          {suggestion.description}
+                                ) : (
+                                  <div className='bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4'>
+                                    <div className='flex items-center gap-3'>
+                                      <svg
+                                        className='w-5 h-5 text-blue-600'
+                                        fill='none'
+                                        stroke='currentColor'
+                                        viewBox='0 0 24 24'
+                                      >
+                                        <path
+                                          strokeLinecap='round'
+                                          strokeLinejoin='round'
+                                          strokeWidth={2}
+                                          d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                        />
+                                      </svg>
+                                      <div>
+                                        <h4 className='font-medium text-blue-900'>
+                                          AI Suggestions Loading...
+                                        </h4>
+                                        <p className='text-sm text-blue-700'>
+                                          Configure AI in development mode to
+                                          get automated fix suggestions
                                         </p>
                                       </div>
-
-                                      {suggestion.code && (
-                                        <div className='bg-gray-50 p-3 rounded-lg mt-2'>
-                                          <span className='block text-sm text-gray-600 mb-1'>
-                                            Proposed Changes:
-                                          </span>
-                                          <pre className='text-black text-sm bg-gray-100 p-2 rounded overflow-x-auto'>
-                                            <code>{suggestion.code}</code>
-                                          </pre>
-                                        </div>
-                                      )}
-
-                                      {suggestion.impact && (
-                                        <div className='mt-2 text-sm text-gray-600'>
-                                          Expected Impact: {suggestion.impact}
-                                        </div>
-                                      )}
                                     </div>
-                                  ))}
+                                  </div>
+                                )
+                              ) : (
+                                <div className='bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4'>
+                                  <div className='flex items-center gap-3'>
+                                    <svg
+                                      className='w-5 h-5 text-gray-600'
+                                      fill='none'
+                                      stroke='currentColor'
+                                      viewBox='0 0 24 24'
+                                    >
+                                      <path
+                                        strokeLinecap='round'
+                                        strokeLinejoin='round'
+                                        strokeWidth={2}
+                                        d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                      />
+                                    </svg>
+                                    <div>
+                                      <h4 className='font-medium text-gray-900'>
+                                        Manual Fix Required
+                                      </h4>
+                                      <p className='text-sm text-gray-600'>
+                                        AI suggestions not available. Please
+                                        review the issue description and
+                                        implement fixes manually.
+                                      </p>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
