@@ -7,8 +7,10 @@ import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import ScoreOverview from '../components/ScoreOverview';
 import AIInsights from '../components/AIInsights';
-import ScoreCard from '../components/ScoreCard';
+import AILoadingState from '../components/AILoadingState';
+
 import IssueReport from '../components/IssueReport';
+import AccessibilityIssues from '../components/AccessibilityIssues';
 
 function Analyzer() {
   const { id } = useParams();
@@ -31,15 +33,12 @@ function Analyzer() {
   // TODO: Implement loadAnalysis for existing analysis IDs if needed
 
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-white dark:bg-dark-bg transition-colors'>
       <Header />
 
       <div className='max-w-7xl mx-auto px-6 py-12'>
         {/* Hero Section - Show only when no results */}
         {!results && <AnalysisForm onSubmit={runAnalysis} loading={loading} />}
-
-        {/* Loading State */}
-        {loading && <LoadingState scanStats={scanStats} />}
 
         {/* Error State */}
         {error && <ErrorState error={error} />}
@@ -49,10 +48,13 @@ function Analyzer() {
           <div className='space-y-8'>
             {/* Header with URL */}
             <div className='text-center'>
-              <h2 className='text-2xl font-bold text-gray-900 mb-2'>
-                Analysis Complete
+              <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-2'>
+                Website Analysis
               </h2>
-              <p className='text-gray-600'>Analysis results ready</p>
+              <p className='text-gray-600 dark:text-gray-400'>
+                Enter the URL of the website you want to analyze for
+                accessibility, performance, and SEO issues.
+              </p>
             </div>
 
             {/* Score Overview */}
@@ -60,13 +62,23 @@ function Analyzer() {
 
             {/* AI Insights - Only show if AI is available */}
             {hasAIAvailable ? (
-              <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
+              aiLoading ? (
+                <AILoadingState
+                  isLoading={aiLoading}
+                  onCancel={() => {
+                    // Allow users to continue without AI analysis if it's taking too long
+                    // This would need to be implemented in the useAnalysis hook
+                  }}
+                />
+              ) : (
+                <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
+              )
             ) : (
-              <div className='bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8'>
+              <div className='bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-8'>
                 <div className='flex items-center gap-4 mb-4'>
-                  <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'>
+                  <div className='w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center'>
                     <svg
-                      className='w-5 h-5 text-blue-600'
+                      className='w-5 h-5 text-blue-600 dark:text-blue-400'
                       fill='none'
                       stroke='currentColor'
                       viewBox='0 0 24 24'
@@ -80,25 +92,25 @@ function Analyzer() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className='text-lg font-semibold text-gray-900'>
+                    <h3 className='text-lg font-semibold text-gray-900 dark:text-dark-text-primary'>
                       Want AI-Powered Insights?
                     </h3>
-                    <p className='text-gray-600 text-sm'>
+                    <p className='text-gray-600 dark:text-dark-text-secondary text-sm'>
                       Configure AI in{' '}
-                      <code className='bg-gray-200 px-1 rounded'>
+                      <code className='bg-gray-200 dark:bg-gray-800 px-1 rounded'>
                         src/config/aiConfig.js
                       </code>{' '}
                       to unlock advanced analysis
                     </p>
                   </div>
                 </div>
-                <div className='text-sm text-gray-600'>
+                <div className='text-sm text-gray-600 dark:text-dark-text-secondary'>
                   <p className='mb-2'>
                     <strong>Quick setup:</strong> Add OpenRouter API key for{' '}
                     <strong>xAI Grok 4 Fast</strong> (free & fastest)
                   </p>
                   <p className='mb-2'>AI analysis includes:</p>
-                  <ul className='list-disc list-inside space-y-1 text-gray-600'>
+                  <ul className='list-disc list-inside space-y-1 text-gray-600 dark:text-dark-text-secondary'>
                     <li>Detailed performance insights</li>
                     <li>Specific optimization recommendations</li>
                     <li>Accessibility improvement suggestions</li>
@@ -113,7 +125,7 @@ function Analyzer() {
               <div className='flex flex-col sm:flex-row gap-4 justify-center items-center'>
                 <button
                   onClick={() => navigateToAiFix()}
-                  className='inline-flex items-center gap-2 px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors'
+                  className='inline-flex items-center gap-2 px-8 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-xl font-medium transition-colors'
                 >
                   <svg
                     className='w-5 h-5'
@@ -133,7 +145,7 @@ function Analyzer() {
 
                 <button
                   onClick={clearAnalysis}
-                  className='inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors'
+                  className='inline-flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors'
                 >
                   <svg
                     className='w-5 h-5'
@@ -153,22 +165,14 @@ function Analyzer() {
               </div>
 
               {websiteUrl && (
-                <p className='text-sm text-gray-500'>
+                <p className='text-sm text-gray-500 dark:text-dark-text-muted'>
                   Current analysis:{' '}
                   <span className='font-medium'>{websiteUrl}</span>
                 </p>
               )}
             </div>
 
-            {/* Detailed Metrics */}
-            <div className='grid md:grid-cols-2 gap-8'>
-              <ScoreCard label='Performance' data={results.performance} />
-              <ScoreCard label='Accessibility' data={results.accessibility} />
-              <ScoreCard label='Best Practices' data={results.bestPractices} />
-              <ScoreCard label='SEO' data={results.seo} />
-            </div>
-
-            <IssueReport results={results} />
+            <IssueReport results={results} websiteUrl={websiteUrl} />
           </div>
         )}
       </div>

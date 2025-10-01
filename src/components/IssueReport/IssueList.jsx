@@ -1,12 +1,12 @@
 import IssueItem from './IssueItem';
 
-function IssueList({ issues }) {
+function IssueList({ issues, websiteUrl }) {
   if (issues.length === 0) {
     return (
       <div className='text-center py-12'>
-        <div className='w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+        <div className='w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4'>
           <svg
-            className='w-8 h-8 text-green-600'
+            className='w-8 h-8 text-green-600 dark:text-green-400'
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
@@ -19,10 +19,10 @@ function IssueList({ issues }) {
             />
           </svg>
         </div>
-        <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+        <h3 className='text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-2'>
           No Issues Found
         </h3>
-        <p className='text-gray-600'>
+        <p className='text-gray-600 dark:text-dark-text-secondary'>
           Great! No issues were found in this category.
         </p>
       </div>
@@ -32,7 +32,7 @@ function IssueList({ issues }) {
   return (
     <div className='space-y-4'>
       {issues.map((issue, index) => (
-        <IssueItem key={index} issue={issue} />
+        <IssueItem key={index} issue={issue} websiteUrl={websiteUrl} />
       ))}
     </div>
   );

@@ -10,28 +10,28 @@ function AnalysisForm({ onSubmit, loading }) {
 
   return (
     <div className='text-center mb-16'>
-      <h1 className='text-4xl font-bold text-gray-900 mb-4'>
-        Website Performance Analysis
+      <h1 className='text-4xl font-bold text-gray-900 dark:text-dark-text-primary mb-4'>
+        Website Analysis
       </h1>
-      <p className='text-xl text-gray-600 mb-12 max-w-2xl mx-auto'>
-        Get AI-powered insights to optimize your website's performance,
-        accessibility, and SEO
+      <p className='text-xl text-gray-600 dark:text-dark-text-secondary mb-12 max-w-2xl mx-auto'>
+        Enter the URL of the website you want to analyze for accessibility,
+        performance, and SEO issues.
       </p>
 
       <form onSubmit={handleSubmit} className='max-w-2xl mx-auto'>
-        <div className='flex gap-3'>
+        <div className='flex gap-3 mb-4'>
           <input
             type='url'
             value={websiteUrl}
             onChange={(e) => setWebsiteUrl(e.target.value)}
-            placeholder='https://example.com'
+            placeholder='Enter website URL'
             required
-            className='flex-1 px-6 py-4 text-lg border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent bg-white'
+            className='flex-1 px-6 py-4 text-lg border border-gray-200 dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text-primary placeholder-gray-500 dark:placeholder-dark-text-muted'
           />
           <button
             type='submit'
             disabled={loading}
-            className='px-8 py-4 bg-black text-white rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
+            className='px-8 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
           >
             {loading ? (
               <>
@@ -39,23 +39,18 @@ function AnalysisForm({ onSubmit, loading }) {
                 Analyzing
               </>
             ) : (
-              <>
-                <svg
-                  className='w-5 h-5'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M13 10V3L4 14h7v7l9-11h-7z'
-                  />
-                </svg>
-                Analyze
-              </>
+              'Analyze'
             )}
+          </button>
+        </div>
+
+        <div className='text-center'>
+          <button
+            type='button'
+            onClick={() => onSubmit('demo')}
+            className='text-sm text-gray-500 dark:text-dark-text-muted hover:text-gray-700 dark:hover:text-dark-text-secondary underline'
+          >
+            Try with sample data
           </button>
         </div>
       </form>
