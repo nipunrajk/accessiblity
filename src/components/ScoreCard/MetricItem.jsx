@@ -7,11 +7,9 @@ function MetricItem({ title, value, score }) {
 
   return (
     <div className='flex items-center justify-between py-2'>
-      <span className='text-sm text-gray-600 dark:text-dark-text-secondary'>
-        {title}
-      </span>
+      <span className='text-sm text-gray-600'>{title}</span>
       <div className='flex items-center gap-3'>
-        <span className='text-sm font-medium text-gray-900 dark:text-dark-text-primary'>
+        <span className='text-sm font-medium text-gray-900'>
           {typeof displayValue === 'number'
             ? Math.round(displayValue) + 'ms'
             : displayValue}

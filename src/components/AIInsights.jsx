@@ -3,11 +3,9 @@ import PropTypes from 'prop-types';
 function AIInsights({ aiAnalysis, aiLoading }) {
   if (aiLoading) {
     return (
-      <div className='bg-gray-50 dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl p-8 text-center'>
-        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-black dark:border-white mx-auto mb-4'></div>
-        <p className='text-gray-600 dark:text-dark-text-secondary'>
-          Generating AI insights...
-        </p>
+      <div className='bg-gray-50 border border-gray-200 rounded-2xl p-8 text-center'>
+        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4'></div>
+        <p className='text-gray-600'>Generating AI insights...</p>
       </div>
     );
   }
@@ -17,11 +15,11 @@ function AIInsights({ aiAnalysis, aiLoading }) {
   }
 
   return (
-    <div className='bg-gradient-to-br from-gray-50 to-white dark:from-dark-surface dark:to-dark-bg border border-gray-200 dark:border-dark-border rounded-2xl p-8'>
+    <div className='bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-2xl p-8'>
       <div className='flex items-center gap-3 mb-6'>
-        <div className='w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center'>
+        <div className='w-8 h-8 bg-black rounded-lg flex items-center justify-center'>
           <svg
-            className='w-4 h-4 text-white dark:text-black'
+            className='w-4 h-4 text-white'
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
@@ -34,12 +32,10 @@ function AIInsights({ aiAnalysis, aiLoading }) {
             />
           </svg>
         </div>
-        <h3 className='text-xl font-bold text-gray-900 dark:text-dark-text-primary'>
-          AI Insights
-        </h3>
+        <h3 className='text-xl font-bold text-gray-900'>AI Insights</h3>
       </div>
-      <div className='prose prose-gray dark:prose-invert max-w-none'>
-        <pre className='whitespace-pre-wrap text-gray-700 dark:text-dark-text-secondary leading-relaxed'>
+      <div className='prose prose-gray max-w-none'>
+        <pre className='whitespace-pre-wrap text-gray-700 leading-relaxed'>
           {aiAnalysis}
         </pre>
       </div>

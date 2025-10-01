@@ -2,8 +2,6 @@ import { Routes, Route } from 'react-router-dom';
 import { Suspense, lazy } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingState from './components/LoadingState';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { AnalysisProvider } from './contexts/AnalysisContext';
 
 // Lazy load pages for better performance
 const SignUp = lazy(() => import('./pages/SignUp'));
@@ -13,21 +11,17 @@ const GitHubConfig = lazy(() => import('./pages/GitHubConfig'));
 
 function App() {
   return (
-    <ThemeProvider>
-      <AnalysisProvider>
-        <ErrorBoundary fallbackMessage='The application encountered an unexpected error. Please refresh the page to continue.'>
-          <Suspense fallback={<LoadingState />}>
-            <Routes>
-              <Route path='/' element={<SignUp />} />
-              <Route path='/analyzer' element={<Analyzer />} />
-              <Route path='/analyze/:id' element={<Analyzer />} />
-              <Route path='/ai-fix' element={<AIFix />} />
-              <Route path='/github-config' element={<GitHubConfig />} />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </AnalysisProvider>
-    </ThemeProvider>
+    <ErrorBoundary fallbackMessage='The application encountered an unexpected error. Please refresh the page to continue.'>
+      <Suspense fallback={<LoadingState />}>
+        <Routes>
+          <Route path='/' element={<SignUp />} />
+          <Route path='/analyzer' element={<Analyzer />} />
+          <Route path='/analyze/:id' element={<Analyzer />} />
+          <Route path='/ai-fix' element={<AIFix />} />
+          <Route path='/github-config' element={<GitHubConfig />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

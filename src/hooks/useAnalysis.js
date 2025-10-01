@@ -1,98 +1,120 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { runLighthouseAnalysis } from '../services/lighthouse';
 import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
 import { isAIAvailable } from '../config/aiConfig';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
-import { useAnalysisContext } from '../contexts/AnalysisContext';
 
 export const useAnalysis = () => {
-  const {
-    loading,
-    results,
-    error,
-    aiAnalysis,
-    aiLoading,
-    scanStats,
-    scannedElements,
-    elementIssues,
-    aiFixes,
-    websiteUrl,
-    dispatch,
-    clearPersistedData,
-  } = useAnalysisContext();
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState(null);
+  const [error, setError] = useState(null);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [scanStats, setScanStats] = useState({
+    pagesScanned: 0,
+    totalPages: 0,
+    scannedUrls: [],
+  });
+  const [scannedElements, setScannedElements] = useState([]);
+  const [elementIssues, setElementIssues] = useState([]);
+  const [aiFixes, setAiFixes] = useState(null);
+  const [websiteUrl, setWebsiteUrl] = useState('');
 
   const navigate = useNavigate();
 
+  // Helper function to clear all persisted data
+  const clearPersistedData = () => {
+    Object.values(STORAGE_KEYS).forEach((key) => {
+      localStorage.removeItem(key);
+    });
+  };
+
+  // Load persisted data on component mount
+  useEffect(() => {
+    const loadPersistedData = () => {
+      try {
+        // Check if user is coming from a fresh login/signup
+        // If they're on the base /analyzer route (not /analyze/:id), clear previous data
+        const currentPath = window.location.pathname;
+        const isBaseAnalyzerRoute = currentPath === '/analyzer';
+
+        if (isBaseAnalyzerRoute) {
+          // User is on the main analyzer page, start fresh
+          clearPersistedData();
+          return;
+        }
+
+        // Only load persisted data if user is on a specific analysis route (/analyze/:id)
+        const savedResults = localStorage.getItem(
+          STORAGE_KEYS.ANALYSIS_RESULTS
+        );
+        const savedAiAnalysis = localStorage.getItem(STORAGE_KEYS.AI_ANALYSIS);
+        const savedAiFixes = localStorage.getItem(STORAGE_KEYS.AI_FIXES);
+        const savedScanStats = localStorage.getItem(STORAGE_KEYS.SCAN_STATS);
+        const savedScannedElements = localStorage.getItem(
+          STORAGE_KEYS.SCANNED_ELEMENTS
+        );
+        const savedElementIssues = localStorage.getItem(
+          STORAGE_KEYS.ELEMENT_ISSUES
+        );
+        const savedWebsiteUrl = localStorage.getItem(STORAGE_KEYS.WEBSITE_URL);
+
+        if (savedResults) setResults(JSON.parse(savedResults));
+        if (savedAiAnalysis) setAiAnalysis(JSON.parse(savedAiAnalysis));
+        if (savedAiFixes) setAiFixes(JSON.parse(savedAiFixes));
+        if (savedScanStats) setScanStats(JSON.parse(savedScanStats));
+        if (savedScannedElements)
+          setScannedElements(JSON.parse(savedScannedElements));
+        if (savedElementIssues)
+          setElementIssues(JSON.parse(savedElementIssues));
+        if (savedWebsiteUrl) setWebsiteUrl(savedWebsiteUrl);
+      } catch (error) {
+        console.error('Error loading persisted data:', error);
+        // Clear corrupted data
+        clearPersistedData();
+      }
+    };
+
+    loadPersistedData();
+  }, []);
+
+  // Helper function to persist data
+  const persistData = (key, data) => {
+    try {
+      if (data !== null && data !== undefined) {
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+    } catch (error) {
+      console.error(`Error persisting ${key}:`, error);
+    }
+  };
+
   const runAnalysis = async (url) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
+    setLoading(true);
+    setError(null);
 
     // Clear previous data
-    dispatch({ type: 'SET_RESULTS', payload: null });
-    dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-    dispatch({ type: 'SET_AI_FIXES', payload: null });
-    dispatch({
-      type: 'SET_SCAN_STATS',
-      payload: { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
-    });
+    setResults(null);
+    setAiAnalysis(null);
+    setAiFixes(null);
+    setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
+    setWebsiteUrl(url);
 
     // Clear persisted data for new analysis
     clearPersistedData();
 
-    // Handle demo/sample data case
-    if (url === 'demo' || url === 'sample') {
-      try {
-        // Load sample data from our demo file
-        const { sampleAnalysisResults } = await import('../data/sampleData.js');
-
-        dispatch({
-          type: 'SET_WEBSITE_URL',
-          payload: 'https://example-demo-site.com',
-        });
-        dispatch({ type: 'SET_RESULTS', payload: sampleAnalysisResults });
-        dispatch({
-          type: 'SET_SCAN_STATS',
-          payload: {
-            pagesScanned: 1,
-            totalPages: 1,
-            scannedUrls: ['https://example-demo-site.com'],
-          },
-        });
-
-        // Add some demo AI analysis if AI is available
-        const hasAI = isAIAvailable();
-        if (hasAI) {
-          dispatch({ type: 'SET_AI_LOADING', payload: true });
-          // Simulate AI analysis delay
-          setTimeout(() => {
-            dispatch({
-              type: 'SET_AI_ANALYSIS',
-              payload:
-                'This demo website shows common accessibility and performance issues. The missing alt text on images makes content inaccessible to screen readers. The large unoptimized images are slowing down page load times. Consider adding descriptive alt text and optimizing image sizes for better user experience.',
-            });
-            dispatch({ type: 'SET_AI_LOADING', payload: false });
-          }, 2000);
-        }
-
-        const analysis = { id: 'demo-' + Date.now().toString() };
-        navigate(`/analyze/${analysis.id}`);
-        return;
-      } catch (demoError) {
-        console.error('Failed to load demo data:', demoError);
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to load demo data' });
-        return;
-      }
-    }
-
-    dispatch({ type: 'SET_WEBSITE_URL', payload: url });
+    // Persist the new website URL
+    localStorage.setItem(STORAGE_KEYS.WEBSITE_URL, url);
 
     try {
       const analysis = { id: Date.now().toString() };
 
       // Run Lighthouse analysis
       const response = await runLighthouseAnalysis(url, (progress) => {
-        dispatch({ type: 'SET_SCAN_STATS', payload: progress });
+        setScanStats(progress);
+        persistData(STORAGE_KEYS.SCAN_STATS, progress);
       });
 
       const analysisResults = {
@@ -102,73 +124,45 @@ export const useAnalysis = () => {
         seo: response.seo,
       };
 
-      dispatch({ type: 'SET_RESULTS', payload: analysisResults });
+      setResults(analysisResults);
+      persistData(STORAGE_KEYS.ANALYSIS_RESULTS, analysisResults);
 
-      // Run AI analysis and DOM scanning in parallel for better performance
+      // Generate AI analysis using backend endpoint
       const hasAI = isAIAvailable();
       if (hasAI) {
-        dispatch({ type: 'SET_AI_LOADING', payload: true });
-
-        // Run AI analysis and DOM scanning in parallel
-        const aiPromises = [];
-
-        // 1. AI Analysis Promise with timeout
-        const aiAnalysisPromise = Promise.race([
-          fetch('/api/ai-analysis', {
+        setAiLoading(true);
+        try {
+          const aiResponse = await fetch('/api/ai-analysis', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ results: response }),
-          }),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error('AI Analysis timeout after 30 seconds')),
-              30000
-            )
-          ),
-        ])
-          .then(async (aiResponse) => {
-            if (aiResponse.ok) {
-              const { analysis } = await aiResponse.json();
-              dispatch({ type: 'SET_AI_ANALYSIS', payload: analysis });
-              return analysis;
-            } else {
-              console.error('AI Analysis failed:', aiResponse.statusText);
-              dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-              return null;
-            }
-          })
-          .catch((aiError) => {
-            console.error('AI Analysis failed:', aiError);
-            dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-            return null;
           });
 
-        // 2. DOM Scanning Promise
-        const domScanPromise = scanWebsiteElements(url)
-          .then(({ elements }) => {
-            dispatch({ type: 'SET_SCANNED_ELEMENTS', payload: elements });
-            const elementIssuesData = Array.isArray(elements) ? elements : [];
-            dispatch({
-              type: 'SET_ELEMENT_ISSUES',
-              payload: elementIssuesData,
-            });
-            return elements;
-          })
-          .catch((err) => {
-            console.error('Element scanning failed:', err);
-            dispatch({ type: 'SET_ELEMENT_ISSUES', payload: [] });
-            return [];
-          });
+          if (aiResponse.ok) {
+            const { analysis } = await aiResponse.json();
+            setAiAnalysis(analysis);
+            persistData(STORAGE_KEYS.AI_ANALYSIS, analysis);
+          } else {
+            console.error('AI Analysis failed:', aiResponse.statusText);
+            setAiAnalysis(null);
+          }
+        } catch (aiError) {
+          console.error('AI Analysis failed:', aiError);
+          // Don't fail the entire analysis if AI fails
+          setAiAnalysis(null);
+        }
+      }
 
-        aiPromises.push(aiAnalysisPromise, domScanPromise);
-
-        // Wait for both AI analysis and DOM scanning to complete
+      // Scan elements and generate AI fixes if AI is available
+      if (hasAI) {
         try {
-          const [aiAnalysis, elements] = await Promise.all(aiPromises);
+          const { elements } = await scanWebsiteElements(url);
+          setScannedElements(elements);
+          persistData(STORAGE_KEYS.SCANNED_ELEMENTS, elements);
 
-          // 3. Generate AI fixes after we have all the data
+          // Get all issues for AI fixes
           const allIssues = [
             ...(response?.performance?.issues || []),
             ...(response?.accessibility?.issues || []),
@@ -177,43 +171,30 @@ export const useAnalysis = () => {
             ...elements, // Add scanned elements as issues
           ];
 
-          // Only generate AI fixes if we have issues and AI analysis succeeded
+          // Generate AI fixes for all issues during analysis
           if (allIssues.length > 0) {
-            try {
-              const aiFixesResponse = await Promise.race([
-                fetch('/api/ai-fixes', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ issues: allIssues }),
-                }),
-                new Promise((_, reject) =>
-                  setTimeout(
-                    () =>
-                      reject(new Error('AI Fixes timeout after 20 seconds')),
-                    20000
-                  )
-                ),
-              ]);
+            const aiFixesResponse = await fetch('/api/ai-fixes', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ issues: allIssues }),
+            });
 
-              if (aiFixesResponse.ok) {
-                const { suggestions } = await aiFixesResponse.json();
-                dispatch({ type: 'SET_AI_FIXES', payload: suggestions });
-              } else {
-                console.warn(
-                  'AI Fixes generation failed:',
-                  aiFixesResponse.statusText
-                );
-                dispatch({ type: 'SET_AI_FIXES', payload: null });
-              }
-            } catch (fixError) {
-              console.warn('AI Fixes generation failed:', fixError);
-              dispatch({ type: 'SET_AI_FIXES', payload: null });
+            if (aiFixesResponse.ok) {
+              const { suggestions } = await aiFixesResponse.json();
+              setAiFixes(suggestions);
+              persistData(STORAGE_KEYS.AI_FIXES, suggestions);
             }
           }
-        } catch (error) {
-          console.error('AI processing failed:', error);
+
+          const elementIssuesData = Array.isArray(elements) ? elements : [];
+          setElementIssues(elementIssuesData);
+          persistData(STORAGE_KEYS.ELEMENT_ISSUES, elementIssuesData);
+        } catch (err) {
+          console.error('Element scanning failed:', err);
+          setElementIssues([]);
+          setAiFixes(null);
         }
       }
 
@@ -224,14 +205,15 @@ export const useAnalysis = () => {
         scannedUrls: response.scanStats?.scannedUrls || scanStats.scannedUrls,
       };
 
-      dispatch({ type: 'SET_SCAN_STATS', payload: finalScanStats });
+      setScanStats(finalScanStats);
+      persistData(STORAGE_KEYS.SCAN_STATS, finalScanStats);
       navigate(`/analyze/${analysis.id}`);
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message });
+      setError(err.message);
       console.error('Analysis failed:', err.message);
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      dispatch({ type: 'SET_AI_LOADING', payload: false });
+      setLoading(false);
+      setAiLoading(false);
     }
   };
 
@@ -258,7 +240,14 @@ export const useAnalysis = () => {
 
   // Function to clear all analysis data
   const clearAnalysis = () => {
-    dispatch({ type: 'CLEAR_ALL' });
+    setResults(null);
+    setAiAnalysis(null);
+    setAiFixes(null);
+    setScanStats({ pagesScanned: 0, totalPages: 0, scannedUrls: [] });
+    setScannedElements([]);
+    setElementIssues([]);
+    setWebsiteUrl('');
+    setError(null);
     clearPersistedData();
   };
 

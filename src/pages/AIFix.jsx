@@ -5,8 +5,6 @@ import { scanWebsiteElements } from '../services/domScanner';
 import { isAIAvailable } from '../config/aiConfig';
 import { STORAGE_KEYS } from '../constants';
 import jsPDF from 'jspdf';
-import IssueScreenshot from '../components/IssueScreenshot';
-import BeforeAfterComparison from '../components/BeforeAfterComparison';
 
 function AIFix() {
   const location = useLocation();
@@ -88,8 +86,6 @@ function AIFix() {
   const [currentSuggestion, setCurrentSuggestion] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [fixResults, setFixResults] = useState(null);
-  const [screenshotStates, setScreenshotStates] = useState({});
-  const [comparisonStates, setComparisonStates] = useState({});
 
   // Step 1: Use cached AI fixes or fetch new ones
   useEffect(() => {
@@ -769,165 +765,48 @@ function AIFix() {
                                 AI Recommendations ({suggestions.length})
                               </h4>
 
-                              {suggestions.map((suggestion, sugIndex) => {
-                                const suggestionKey = `${issueTitle}-${sugIndex}`;
-                                const showScreenshot =
-                                  screenshotStates[suggestionKey] || false;
-                                const showComparison =
-                                  comparisonStates[suggestionKey] || false;
-
-                                return (
-                                  <div
-                                    key={sugIndex}
-                                    className='bg-white rounded-lg p-4 border border-gray-200'
-                                  >
-                                    <div className='mb-3'>
-                                      <h5 className='font-medium text-gray-800 mb-2'>
-                                        {suggestion.description}
-                                      </h5>
-                                      {suggestion.implementation && (
-                                        <p className='text-sm text-gray-600 mb-2'>
-                                          <strong>Implementation:</strong>{' '}
-                                          {suggestion.implementation}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className='flex flex-wrap gap-2 mb-4'>
-                                      <button
-                                        onClick={() =>
-                                          setScreenshotStates((prev) => ({
-                                            ...prev,
-                                            [suggestionKey]: !showScreenshot,
-                                          }))
-                                        }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors'
-                                      >
-                                        <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
-                                        >
-                                          <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'
-                                          />
-                                        </svg>
-                                        {showScreenshot
-                                          ? 'Hide Screenshot'
-                                          : 'Show Screenshot'}
-                                      </button>
-
-                                      <button
-                                        onClick={() =>
-                                          setComparisonStates((prev) => ({
-                                            ...prev,
-                                            [suggestionKey]: !showComparison,
-                                          }))
-                                        }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors'
-                                      >
-                                        <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
-                                        >
-                                          <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
-                                          />
-                                        </svg>
-                                        {showComparison
-                                          ? 'Hide Comparison'
-                                          : 'Before/After'}
-                                      </button>
-
-                                      <button
-                                        onClick={() =>
-                                          handleApplyFix(suggestion)
-                                        }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors'
-                                      >
-                                        <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
-                                        >
-                                          <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                            strokeWidth={2}
-                                            d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
-                                          />
-                                        </svg>
-                                        Apply Fix
-                                      </button>
-                                    </div>
-
-                                    {(suggestion.code ||
-                                      suggestion.codeExample) && (
-                                      <div className='bg-gray-50 p-3 rounded-lg mb-3'>
-                                        <span className='block text-sm text-gray-600 mb-2 font-medium'>
-                                          Code Example:
-                                        </span>
-                                        <pre className='text-black text-sm bg-gray-100 p-3 rounded overflow-x-auto'>
-                                          <code>
-                                            {suggestion.code ||
-                                              suggestion.codeExample}
-                                          </code>
-                                        </pre>
-                                      </div>
-                                    )}
-
-                                    {(suggestion.impact ||
-                                      suggestion.expectedImpact) && (
-                                      <div className='text-sm text-green-700 bg-green-50 p-2 rounded mb-3'>
-                                        <strong>Expected Impact:</strong>{' '}
-                                        {suggestion.impact ||
-                                          suggestion.expectedImpact}
-                                      </div>
-                                    )}
-
-                                    {/* Screenshot Section */}
-                                    {showScreenshot && (
-                                      <div className='mt-4 pt-4 border-t border-gray-200'>
-                                        <IssueScreenshot
-                                          issue={{
-                                            title: issueTitle,
-                                            type:
-                                              issues.find(
-                                                (i) => i.title === issueTitle
-                                              )?.type || 'accessibility',
-                                            selector: issues.find(
-                                              (i) => i.title === issueTitle
-                                            )?.selector,
-                                          }}
-                                          websiteUrl={websiteUrl}
-                                          className='max-w-2xl mx-auto'
-                                        />
-                                      </div>
-                                    )}
-
-                                    {/* Before/After Comparison Section */}
-                                    {showComparison && (
-                                      <div className='mt-4 pt-4 border-t border-gray-200'>
-                                        <BeforeAfterComparison
-                                          title={`Fix: ${issueTitle}`}
-                                          className='max-w-2xl mx-auto'
-                                        />
-                                      </div>
+                              {suggestions.map((suggestion, sugIndex) => (
+                                <div
+                                  key={sugIndex}
+                                  className='bg-white rounded-lg p-4 border border-gray-200'
+                                >
+                                  <div className='mb-3'>
+                                    <h5 className='font-medium text-gray-800 mb-2'>
+                                      {suggestion.description}
+                                    </h5>
+                                    {suggestion.implementation && (
+                                      <p className='text-sm text-gray-600 mb-2'>
+                                        <strong>Implementation:</strong>{' '}
+                                        {suggestion.implementation}
+                                      </p>
                                     )}
                                   </div>
-                                );
-                              })}
+
+                                  {(suggestion.code ||
+                                    suggestion.codeExample) && (
+                                    <div className='bg-gray-50 p-3 rounded-lg mb-3'>
+                                      <span className='block text-sm text-gray-600 mb-2 font-medium'>
+                                        Code Example:
+                                      </span>
+                                      <pre className='text-black text-sm bg-gray-100 p-3 rounded overflow-x-auto'>
+                                        <code>
+                                          {suggestion.code ||
+                                            suggestion.codeExample}
+                                        </code>
+                                      </pre>
+                                    </div>
+                                  )}
+
+                                  {(suggestion.impact ||
+                                    suggestion.expectedImpact) && (
+                                    <div className='text-sm text-green-700 bg-green-50 p-2 rounded'>
+                                      <strong>Expected Impact:</strong>{' '}
+                                      {suggestion.impact ||
+                                        suggestion.expectedImpact}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )

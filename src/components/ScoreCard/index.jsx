@@ -23,18 +23,14 @@ function ScoreCard({ label, data }) {
   };
 
   return (
-    <div className='bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-2xl p-6'>
+    <div className='bg-white border border-gray-200 rounded-2xl p-6'>
       <div className='flex items-center justify-between mb-6'>
-        <h3 className='text-lg font-semibold text-gray-900 dark:text-dark-text-primary'>
-          {label}
-        </h3>
+        <h3 className='text-lg font-semibold text-gray-900'>{label}</h3>
         <div className='text-right'>
-          <div className='text-2xl font-bold text-gray-900 dark:text-dark-text-primary'>
+          <div className='text-2xl font-bold text-gray-900'>
             {Math.round(data.score)}%
           </div>
-          <div className='text-sm text-gray-500 dark:text-dark-text-muted'>
-            Score
-          </div>
+          <div className='text-sm text-gray-500'>Score</div>
         </div>
       </div>
 

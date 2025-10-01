@@ -1,28 +1,22 @@
 import { useNavigate } from 'react-router-dom';
-import ThemeToggle from './ThemeToggle';
 
 function Header() {
   const navigate = useNavigate();
 
   return (
-    <header className='border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-dark-bg transition-colors'>
+    <header className='border-b border-gray-100'>
       <div className='max-w-7xl mx-auto px-6 py-4'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-3'>
-            <div className='w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center'>
-              <span className='text-white dark:text-black font-bold text-sm'>
-                FF
-              </span>
+            <div className='w-8 h-8 bg-black rounded-lg flex items-center justify-center'>
+              <span className='text-white font-bold text-sm'>FF</span>
             </div>
-            <span className='font-semibold text-gray-900 dark:text-white'>
-              FastFix
-            </span>
+            <span className='font-semibold text-gray-900'>FastFix</span>
           </div>
           <div className='flex items-center gap-4'>
-            <ThemeToggle />
             <button
               onClick={() => navigate('/github-config')}
-              className='p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800'
+              className='p-2 text-gray-600 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-100'
               title='GitHub Integration'
             >
               <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 24 24'>
