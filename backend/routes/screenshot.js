@@ -1,6 +1,7 @@
-const express = require('express');
+import express from 'express';
+import screenshotService from '../services/screenshotService.js';
+
 const router = express.Router();
-const screenshotService = require('../services/screenshotService');
 
 // Basic screenshot endpoint
 router.post('/capture', async (req, res) => {
@@ -107,4 +108,4 @@ router.post('/comparison', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

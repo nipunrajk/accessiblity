@@ -1,6 +1,6 @@
-const puppeteer = require('puppeteer');
-const path = require('path');
-const fs = require('fs').promises;
+import puppeteer from 'puppeteer';
+import path from 'path';
+import { promises as fs } from 'fs';
 
 class ScreenshotService {
   constructor() {
@@ -284,4 +284,4 @@ class ScreenshotService {
   }
 }
 
-module.exports = new ScreenshotService();
+export default new ScreenshotService();
