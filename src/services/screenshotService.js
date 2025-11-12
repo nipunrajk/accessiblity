@@ -1,3 +1,6 @@
+import { createScreenshotError, handleError } from '../utils/errorHandler';
+import logger from '../utils/logger';
+
 // Screenshot service for capturing and highlighting issues
 export class ScreenshotService {
   constructor() {
@@ -48,9 +51,16 @@ export class ScreenshotService {
         throw new Error(data.error || 'Screenshot capture failed');
       }
     } catch (error) {
-      console.error('Screenshot capture error:', error);
+      const screenshotError = createScreenshotError(
+        'Screenshot capture failed',
+        error,
+        { url, issueCount: issues.length }
+      );
+      logger.warn('Screenshot unavailable, using placeholder', {
+        error: error.message,
+        url,
+      });
       // Fallback to mock screenshot if real capture fails
-      console.log('Falling back to mock screenshot...');
       return this.createMockScreenshot(issues[0]?.type || 'accessibility');
     }
   }
@@ -100,9 +110,16 @@ export class ScreenshotService {
         throw new Error(data.error || 'Comparison generation failed');
       }
     } catch (error) {
-      console.error('Comparison generation error:', error);
+      const comparisonError = createScreenshotError(
+        'Comparison generation failed',
+        error,
+        { url, fixCount: fixes.length }
+      );
+      logger.warn('Comparison unavailable, using placeholder', {
+        error: error.message,
+        url,
+      });
       // Fallback to mock comparison if real capture fails
-      console.log('Falling back to mock comparison...');
       return {
         success: true,
         before: null, // Will use mock data in component

@@ -1,6 +1,11 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import puppeteer from 'puppeteer';
+import logger from '../utils/logger.js';
+import {
+  createExternalAPIError,
+  createInternalError,
+} from '../utils/errorHandler.js';
 
 class LighthouseService {
   constructor() {
@@ -101,7 +106,10 @@ class LighthouseService {
           }
         } catch (error) {
           if (error.name !== 'TimeoutError') {
-            console.error(`Failed to visit ${currentUrl}:`, error.message);
+            logger.warn(`Failed to visit page during discovery`, {
+              url: currentUrl,
+              error: error.message,
+            });
           }
         }
       }
@@ -129,8 +137,8 @@ class LighthouseService {
       const report = JSON.parse(result.report);
       return this.processLighthouseReport(report);
     } catch (error) {
-      console.error('Error analyzing page:', error);
-      throw error;
+      logger.error('Lighthouse analysis failed for page', error, { url });
+      throw createExternalAPIError('Lighthouse', error);
     }
   }
 
@@ -306,7 +314,8 @@ class LighthouseService {
             });
           }
         } catch (error) {
-          console.error(`Error analyzing ${route}:`, error);
+          logger.error(`Failed to analyze page`, error, { url: route });
+          // Continue with other pages even if one fails
         }
       }
     } finally {
