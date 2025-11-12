@@ -60,9 +60,17 @@ const AnalysisContext = createContext();
 export function AnalysisProvider({ children }) {
   const [state, dispatch] = useReducer(analysisReducer, initialState);
 
-  // Load persisted data on mount
+  // Load persisted data on mount (unless it's a fresh login)
   useEffect(() => {
     const loadPersistedData = () => {
+      // Check if this is a fresh login - if so, don't load old data
+      const isFreshLogin = sessionStorage.getItem('freshLogin');
+      if (isFreshLogin) {
+        sessionStorage.removeItem('freshLogin'); // Clear the flag
+        console.log('🔄 Fresh login detected - starting with clean state');
+        return; // Don't load persisted data
+      }
+
       try {
         const persistedData = {};
 
@@ -94,6 +102,7 @@ export function AnalysisProvider({ children }) {
 
         if (Object.keys(persistedData).length > 0) {
           dispatch({ type: 'LOAD_PERSISTED_DATA', payload: persistedData });
+          console.log('📊 Restored previous analysis data');
         }
       } catch (error) {
         console.error('Error loading persisted data:', error);
@@ -157,10 +166,17 @@ export function AnalysisProvider({ children }) {
       localStorage.setItem(STORAGE_KEYS.WEBSITE_URL, state.websiteUrl);
   }, [state.websiteUrl]);
 
+  // Method to clear all analysis data (useful for logout/login)
+  const clearAllAnalysisData = () => {
+    dispatch({ type: 'CLEAR_ALL' });
+    clearPersistedData();
+  };
+
   const contextValue = {
     ...state,
     dispatch,
     clearPersistedData,
+    clearAllAnalysisData,
   };
 
   return (

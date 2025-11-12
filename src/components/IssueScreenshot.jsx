@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { screenshotService } from '../services/screenshotService';
+import screenshotService from '../services/screenshotService';
 
 function IssueScreenshot({ issue, websiteUrl, className = '' }) {
   const [screenshot, setScreenshot] = useState(null);
@@ -18,16 +18,24 @@ function IssueScreenshot({ issue, websiteUrl, className = '' }) {
     setError(null);
 
     try {
-      // For demo purposes, use mock screenshots
-      // In production, this would call the real screenshot service
-      const result = screenshotService.createMockScreenshot(issue.type);
+      // Call the real screenshot service with issue highlights
+      const result = await screenshotService.captureWithHighlights(
+        websiteUrl,
+        [issue],
+        {
+          width: 1200,
+          height: 800,
+          fullPage: false,
+        }
+      );
 
       if (result.success) {
         setScreenshot(result);
       } else {
-        setError(result.error);
+        setError(result.error || 'Failed to capture screenshot');
       }
     } catch (err) {
+      console.error('Screenshot capture error:', err);
       setError('Failed to capture screenshot');
     } finally {
       setLoading(false);
@@ -92,25 +100,7 @@ function IssueScreenshot({ issue, websiteUrl, className = '' }) {
           className='w-full h-auto'
         />
 
-        {/* Issue Highlights Overlay */}
-        {screenshot.highlights &&
-          screenshot.highlights.map((highlight, index) => (
-            <div
-              key={index}
-              className='absolute border-2 border-red-500 bg-red-500/20 rounded'
-              style={{
-                left: `${(highlight.x / 400) * 100}%`,
-                top: `${(highlight.y / 300) * 100}%`,
-                width: `${(highlight.width / 400) * 100}%`,
-                height: `${(highlight.height / 300) * 100}%`,
-              }}
-            >
-              {/* Highlight Label */}
-              <div className='absolute -top-8 left-0 bg-red-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap'>
-                {highlight.issue}
-              </div>
-            </div>
-          ))}
+        {/* Note: Highlights are already rendered in the screenshot by the backend */}
       </div>
 
       {/* Screenshot Info */}

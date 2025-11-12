@@ -50,3 +50,9 @@ Thumbs.db
 # Config files
 backend/config.json
 backend/.env
+
+.kiro/settings
+
+# Screenshots (can be removed manually)
+screenshots/
+*.png

@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { STORAGE_KEYS } from '../constants';
 import '../styles/SignUp.css';
 
-function SignUp() {
+function Login() {
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
   });
@@ -25,13 +24,8 @@ function SignUp() {
     setError('');
 
     // Basic validation
-    if (!formData.username || !formData.email || !formData.password) {
+    if (!formData.email || !formData.password) {
       setError('All fields are required');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
       return;
     }
 
@@ -43,7 +37,7 @@ function SignUp() {
     // Set a flag to indicate fresh login
     sessionStorage.setItem('freshLogin', 'true');
 
-    // Here you would typically make an API call to register the user
+    // Here you would typically make an API call to authenticate the user
     navigate('/analyzer');
   };
 
@@ -51,25 +45,14 @@ function SignUp() {
     <div className='signup-container'>
       <div className='signup-card'>
         <img src='../../public/logo.svg' alt='FastFix Logo' className='logo' />
-        <h1>Join FastFix</h1>
+        <h1>Welcome Back</h1>
         <p className='subtitle'>
-          Already have an account? <a href='/login'>Sign in</a>
+          Don't have an account? <a href='/'>Sign up</a>
         </p>
 
         {error && <div className='error-message'>{error}</div>}
 
         <form onSubmit={handleSubmit} className='signup-form'>
-          <div className='form-group'>
-            <label htmlFor='username'>Username</label>
-            <input
-              type='text'
-              id='username'
-              name='username'
-              value={formData.username}
-              onChange={handleChange}
-            />
-          </div>
-
           <div className='form-group'>
             <label htmlFor='email'>Email address</label>
             <input
@@ -95,7 +78,7 @@ function SignUp() {
           </div>
 
           <button type='submit' className='signup-button'>
-            Create account
+            Sign in
           </button>
         </form>
       </div>
@@ -103,4 +86,4 @@ function SignUp() {
   );
 }
 
-export default SignUp;
+export default Login;

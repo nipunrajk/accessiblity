@@ -1,4 +1,5 @@
 import { getActiveAIProvider, isAIAvailable } from '../config/aiConfig.js';
+import logger from '../utils/logger.js';
 
 class AIProvider {
   constructor() {
@@ -9,17 +10,13 @@ class AIProvider {
   initialize() {
     this.provider = getActiveAIProvider();
     if (this.provider) {
-      console.log(
-        `🤖 AI Provider: ${this.provider.name} (${this.provider.model})`
+      logger.info(
+        `AI Provider: ${this.provider.name} (${this.provider.model})`
       );
-      console.log('✅ AI-powered analysis enabled');
+      logger.success('AI-powered analysis enabled');
     } else {
-      console.log(
-        'ℹ️  AI not configured. Check src/config/aiConfig.js for setup instructions.'
-      );
-      console.log(
-        '💡 Quick start: Set openrouter.enabled = true for free AI models'
-      );
+      logger.info('AI not configured. Check src/config/aiConfig.js for setup');
+      logger.debug('Quick start: Configure AI provider in aiConfig.js');
     }
   }
 
@@ -50,7 +47,7 @@ class AIProvider {
           throw new Error(`Unsupported provider: ${this.provider.name}`);
       }
     } catch (error) {
-      console.error(`AI Provider Error (${this.provider.name}):`, error);
+      logger.error(`AI Provider Error (${this.provider.name})`, error);
       throw error;
     }
   }
@@ -126,12 +123,11 @@ class AIProvider {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenRouter API Error Details:', {
+      logger.error('OpenRouter API Error', null, {
         status: response.status,
         statusText: response.statusText,
         model: this.provider.model,
         hasApiKey: !!this.provider.apiKey,
-        errorBody: errorText,
       });
       throw new Error(
         `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`
@@ -141,7 +137,7 @@ class AIProvider {
     const data = await response.json();
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('Unexpected OpenRouter response format:', data);
+      logger.error('Unexpected OpenRouter response format', null, { data });
       throw new Error('Invalid response format from OpenRouter');
     }
 

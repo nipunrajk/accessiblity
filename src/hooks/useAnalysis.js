@@ -4,7 +4,14 @@ import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
 import { isAIAvailable } from '../config/aiConfig';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
+import { TIMEOUTS } from '../constants/timeouts';
 import { useAnalysisContext } from '../contexts/AnalysisContext';
+import {
+  handleError,
+  createAIProviderError,
+  createAnalysisError,
+} from '../utils/errorHandler';
+import logger from '../utils/logger';
 
 export const useAnalysis = () => {
   const {
@@ -123,8 +130,8 @@ export const useAnalysis = () => {
           }),
           new Promise((_, reject) =>
             setTimeout(
-              () => reject(new Error('AI Analysis timeout after 30 seconds')),
-              30000
+              () => reject(new Error('AI Analysis timeout')),
+              TIMEOUTS.AI_ANALYSIS
             )
           ),
         ])
@@ -132,15 +139,32 @@ export const useAnalysis = () => {
             if (aiResponse.ok) {
               const { analysis } = await aiResponse.json();
               dispatch({ type: 'SET_AI_ANALYSIS', payload: analysis });
+              logger.success('AI analysis completed');
               return analysis;
             } else {
-              console.error('AI Analysis failed:', aiResponse.statusText);
+              const error = createAIProviderError(
+                'AI analysis failed',
+                new Error(aiResponse.statusText),
+                { status: aiResponse.status }
+              );
+              logger.warn(
+                'AI analysis unavailable, continuing without AI insights',
+                {
+                  status: aiResponse.status,
+                }
+              );
               dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
               return null;
             }
           })
           .catch((aiError) => {
-            console.error('AI Analysis failed:', aiError);
+            const error = createAIProviderError('AI analysis failed', aiError);
+            logger.warn(
+              'AI analysis unavailable, continuing without AI insights',
+              {
+                error: aiError.message,
+              }
+            );
             dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
             return null;
           });
@@ -154,10 +178,18 @@ export const useAnalysis = () => {
               type: 'SET_ELEMENT_ISSUES',
               payload: elementIssuesData,
             });
+            logger.success('DOM scanning completed', {
+              elementCount: elements.length,
+            });
             return elements;
           })
           .catch((err) => {
-            console.error('Element scanning failed:', err);
+            logger.warn(
+              'Element scanning failed, continuing with basic analysis',
+              {
+                error: err.message,
+              }
+            );
             dispatch({ type: 'SET_ELEMENT_ISSUES', payload: [] });
             return [];
           });
@@ -190,9 +222,8 @@ export const useAnalysis = () => {
                 }),
                 new Promise((_, reject) =>
                   setTimeout(
-                    () =>
-                      reject(new Error('AI Fixes timeout after 20 seconds')),
-                    20000
+                    () => reject(new Error('AI Fixes timeout')),
+                    TIMEOUTS.AI_FIXES
                   )
                 ),
               ]);
@@ -200,20 +231,35 @@ export const useAnalysis = () => {
               if (aiFixesResponse.ok) {
                 const { suggestions } = await aiFixesResponse.json();
                 dispatch({ type: 'SET_AI_FIXES', payload: suggestions });
+                logger.success('AI fixes generated', {
+                  fixCount: Object.keys(suggestions).length,
+                });
               } else {
-                console.warn(
-                  'AI Fixes generation failed:',
-                  aiFixesResponse.statusText
+                logger.warn(
+                  'AI fixes unavailable, analysis complete without fix suggestions',
+                  {
+                    status: aiFixesResponse.status,
+                  }
                 );
                 dispatch({ type: 'SET_AI_FIXES', payload: null });
               }
             } catch (fixError) {
-              console.warn('AI Fixes generation failed:', fixError);
+              logger.warn(
+                'AI fixes unavailable, analysis complete without fix suggestions',
+                {
+                  error: fixError.message,
+                }
+              );
               dispatch({ type: 'SET_AI_FIXES', payload: null });
             }
           }
         } catch (error) {
-          console.error('AI processing failed:', error);
+          logger.warn(
+            'AI processing encountered an error, continuing with basic analysis',
+            {
+              error: error.message,
+            }
+          );
         }
       }
 
@@ -227,8 +273,12 @@ export const useAnalysis = () => {
       dispatch({ type: 'SET_SCAN_STATS', payload: finalScanStats });
       navigate(`/analyze/${analysis.id}`);
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message });
-      console.error('Analysis failed:', err.message);
+      const error = createAnalysisError('Website analysis failed', err, {
+        url,
+      });
+      const errorInfo = handleError(error);
+      dispatch({ type: 'SET_ERROR', payload: errorInfo.message });
+      logger.error('Analysis failed', err, { url });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
       dispatch({ type: 'SET_AI_LOADING', payload: false });

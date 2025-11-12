@@ -1,6 +1,16 @@
+// Load environment variables FIRST before any other imports
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '.env') });
+
+// Now import everything else
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import analysisController from './controllers/analysisController.js';
 import aiController from './controllers/aiController.js';
 import {
@@ -14,8 +24,7 @@ import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
 // Import screenshot routes (keeping the new functionality)
 import screenshotRoutes from './routes/screenshot.js';
-
-dotenv.config();
+import logger from './utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +67,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to check environment variables
+app.get('/debug/env', (req, res) => {
+  res.json({
+    AI_PROVIDER: process.env.AI_PROVIDER || 'Not set',
+    AI_API_KEY: process.env.AI_API_KEY
+      ? 'Set (length: ' + process.env.AI_API_KEY.length + ')'
+      : 'Not set',
+    AI_MODEL: process.env.AI_MODEL || 'Not set',
+    NODE_ENV: process.env.NODE_ENV || 'Not set',
+  });
+});
+
 // 404 handler for undefined routes
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -75,22 +96,17 @@ import screenshotService from './services/screenshotService.js';
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, shutting down gracefully');
   await screenshotService.closeBrowser();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logger.info('SIGINT received, shutting down gracefully');
   await screenshotService.closeBrowser();
   process.exit(0);
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 FastFix server running at http://localhost:${PORT}`);
-  console.log(`📊 Health check available at http://localhost:${PORT}/health`);
-  console.log(
-    `📸 Screenshot service available at http://localhost:${PORT}/api/screenshot`
-  );
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.serverStart(PORT, process.env.NODE_ENV || 'development');
 });

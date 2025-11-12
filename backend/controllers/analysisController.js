@@ -1,10 +1,13 @@
 import lighthouseService from '../services/lighthouseService.js';
 import puppeteer from 'puppeteer';
 import { validateUrl } from '../utils/validation.js';
+import aiAnalysisService from '../services/aiAnalysisService.js';
+import { PUPPETEER } from '../constants/index.js';
+import logger from '../utils/logger.js';
 
 class AnalysisController {
   async analyzeWebsite(req, res) {
-    const { url } = req.body;
+    const { url, includeAI = true } = req.body;
 
     // Validate URL
     const validatedUrl = validateUrl(url);
@@ -21,6 +24,9 @@ class AnalysisController {
         res.write(`data: ${JSON.stringify(progress)}\n\n`);
       };
 
+      // Send initial progress
+      sendProgress({ message: 'Starting website analysis...', progress: 0 });
+
       const scanResults = await lighthouseService.scanWebsite(
         validatedUrl,
         sendProgress
@@ -33,19 +39,80 @@ class AnalysisController {
         seo: { score: 0 },
       };
 
+      // Send lighthouse results first
+      const baseResponse = {
+        ...mainResults,
+        scanStats: {
+          pagesScanned: scanResults.stats.pagesScanned,
+          totalPages: scanResults.stats.totalPages,
+          scannedUrls: scanResults.urls.map((u) => u.url),
+        },
+      };
+
+      res.write(
+        `data: ${JSON.stringify({ ...baseResponse, progress: 70 })}\n\n`
+      );
+
+      let aiInsights = null;
+      let aiFixes = null;
+
+      // Generate AI insights and fixes if requested
+      if (includeAI) {
+        sendProgress({ message: 'Generating AI insights...', progress: 75 });
+
+        aiInsights = await aiAnalysisService.generateInsights(mainResults);
+
+        if (aiInsights) {
+          res.write(
+            `data: ${JSON.stringify({
+              ...baseResponse,
+              aiInsights,
+              progress: 85,
+            })}\n\n`
+          );
+        }
+
+        // Generate AI fixes for issues if available
+        const allIssues = [];
+        scanResults.urls.forEach((urlResult) => {
+          if (urlResult.issues) {
+            allIssues.push(...urlResult.issues);
+          }
+        });
+
+        if (allIssues.length > 0) {
+          sendProgress({
+            message: 'Generating AI-powered fixes...',
+            progress: 90,
+          });
+
+          aiFixes = await aiAnalysisService.generateFixes(allIssues);
+
+          if (aiFixes) {
+            res.write(
+              `data: ${JSON.stringify({
+                ...baseResponse,
+                aiInsights,
+                aiFixes,
+                progress: 95,
+              })}\n\n`
+            );
+          }
+        }
+      }
+
+      // Send final response
       res.write(
         `data: ${JSON.stringify({
-          ...mainResults,
-          scanStats: {
-            pagesScanned: scanResults.stats.pagesScanned,
-            totalPages: scanResults.stats.totalPages,
-            scannedUrls: scanResults.urls.map((u) => u.url),
-          },
+          ...baseResponse,
+          aiInsights,
+          aiFixes,
           done: true,
+          progress: 100,
         })}\n\n`
       );
     } catch (error) {
-      console.error('Analysis failed:', error);
+      logger.error('Analysis failed', error, { url: validatedUrl });
       res.write(
         `data: ${JSON.stringify({ error: 'Failed to analyze website' })}\n\n`
       );
@@ -59,12 +126,12 @@ class AnalysisController {
       const { url } = req.body;
 
       const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: PUPPETEER.HEADLESS,
+        args: PUPPETEER.ARGS,
       });
 
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle0' });
+      await page.goto(url, { waitUntil: PUPPETEER.WAIT_UNTIL });
 
       const elements = await page.evaluate(() => {
         const getAllElements = (root) => {
@@ -116,9 +183,12 @@ class AnalysisController {
       });
 
       await browser.close();
+      logger.success('Element scanning completed', {
+        elementCount: elements.length,
+      });
       res.json({ elements });
     } catch (error) {
-      console.error('Error scanning elements:', error);
+      logger.error('Error scanning elements', error, { url });
       res.status(500).json({ error: error.message });
     }
   }

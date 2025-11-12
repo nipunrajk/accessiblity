@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Octokit } from '@octokit/rest';
+import logger from '../utils/logger.js';
 
 const CONFIG_PATH = path.join(process.cwd(), 'config.json');
 
@@ -60,7 +61,7 @@ export const connectGitHub = async (req, res) => {
             updated_at: r.updated_at,
           }));
         } catch (error) {
-          console.warn('Could not fetch repositories:', error.message);
+          logger.warn('Could not fetch repositories', error);
         }
       }
 
@@ -87,7 +88,7 @@ export const connectGitHub = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('GitHub connection error:', error);
+    logger.error('GitHub connection error', error);
     res.status(500).json({
       success: false,
       message: 'Failed to connect to GitHub: ' + error.message,

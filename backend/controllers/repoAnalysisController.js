@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/rest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { JSDOM } from 'jsdom';
+import logger from '../utils/logger.js';
 
 const getGitConfig = async () => {
   try {
@@ -674,7 +675,7 @@ export const analyzeRepository = async (req, res) => {
           currentFile: file.path,
         });
       } catch (error) {
-        console.error(`Error analyzing ${file.path}:`, error);
+        logger.error('Error analyzing file', error, { filePath: file.path });
         sendProgress({
           message: `Error analyzing ${file.path}: ${error.message}`,
           pagesScanned: i + 1,
@@ -748,7 +749,7 @@ export const analyzeRepository = async (req, res) => {
     res.write(`data: ${JSON.stringify(results)}\n\n`);
     res.end();
   } catch (error) {
-    console.error('Repository analysis failed:', error);
+    logger.error('Repository analysis failed', error);
     res.write(
       `data: ${JSON.stringify({
         error: `Repository analysis failed: ${error.message}`,
