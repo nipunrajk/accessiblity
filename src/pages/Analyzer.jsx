@@ -11,6 +11,7 @@ import AILoadingState from '../components/AILoadingState';
 
 import IssueReport from '../components/IssueReport';
 import AccessibilityIssues from '../components/AccessibilityIssues';
+import ScreenshotButton from '../components/ScreenshotButton';
 
 function Analyzer() {
   const { id } = useParams();
@@ -22,6 +23,7 @@ function Analyzer() {
     aiLoading,
     scanStats,
     websiteUrl,
+    elementIssues,
     runAnalysis,
     navigateToAiFix,
     clearAnalysis,
@@ -129,6 +131,60 @@ function Analyzer() {
                     <li>SEO enhancement tips</li>
                   </ul>
                 </div>
+              </div>
+            )}
+
+            {/* Screenshot Feature */}
+            {websiteUrl && (
+              <div className='bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-6'>
+                <div className='flex items-center gap-3 mb-4'>
+                  <div className='w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center'>
+                    <svg
+                      className='w-5 h-5 text-purple-600 dark:text-purple-400'
+                      fill='none'
+                      stroke='currentColor'
+                      viewBox='0 0 24 24'
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'
+                      />
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        strokeWidth={2}
+                        d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'
+                      />
+                    </svg>
+                  </div>
+                  <div className='flex-1'>
+                    <h3 className='text-lg font-semibold text-gray-900 dark:text-dark-text-primary'>
+                      Visual Issue Documentation
+                    </h3>
+                    <p className='text-gray-600 dark:text-dark-text-secondary text-sm'>
+                      Capture annotated screenshots of element-level issues
+                    </p>
+                  </div>
+                  {elementIssues && elementIssues.length > 0 && (
+                    <div className='bg-purple-100 dark:bg-purple-900/50 px-3 py-1 rounded-full'>
+                      <span className='text-sm font-semibold text-purple-700 dark:text-purple-300'>
+                        {elementIssues.length} elements
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <ScreenshotButton
+                  url={websiteUrl}
+                  issues={[
+                    ...(results?.accessibility?.issues || []),
+                    ...(results?.performance?.issues || []),
+                    ...(results?.bestPractices?.issues || []),
+                    ...(results?.seo?.issues || []),
+                    ...(elementIssues || []),
+                  ]}
+                />
               </div>
             )}
 

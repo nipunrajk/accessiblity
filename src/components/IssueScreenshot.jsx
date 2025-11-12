@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { screenshotService } from '../services/screenshotService';
+import screenshotService from '../services/screenshotService';
 
 function IssueScreenshot({ issue, websiteUrl, className = '' }) {
   const [screenshot, setScreenshot] = useState(null);
