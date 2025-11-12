@@ -96,6 +96,20 @@ cd backend && npm start  # Backend → http://localhost:3001
 3. **Click** "Analyze" to see Lighthouse results
 4. **Configure AI** for enhanced insights (see [AI Setup](#-ai-configuration))
 
+### 🤖 Quick AI Setup (Optional but Recommended)
+
+```bash
+# Production-ready setup - provider + API key + model:
+npm run ai:setup openrouter sk-or-v1-your-key x-ai/grok-4-fast:free  # Free Grok
+npm run ai:setup openai sk-your-openai-key gpt-3.5-turbo             # OpenAI
+npm run ai:setup ollama                                               # Local (no key)
+
+# Check status:
+npm run ai:status
+```
+
+📖 **Detailed AI setup guide**: [AI_SETUP.md](AI_SETUP.md)
+
 ## ⚙️ Configuration
 
 ### Environment Files

@@ -50,3 +50,5 @@ Thumbs.db
 # Config files
 backend/config.json
 backend/.env
+
+.kiro/settings

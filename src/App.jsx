@@ -7,6 +7,7 @@ import { AnalysisProvider } from './contexts/AnalysisContext';
 
 // Lazy load pages for better performance
 const SignUp = lazy(() => import('./pages/SignUp'));
+const Login = lazy(() => import('./pages/Login'));
 const Analyzer = lazy(() => import('./pages/Analyzer'));
 const AIFix = lazy(() => import('./pages/AIFix'));
 const GitHubConfig = lazy(() => import('./pages/GitHubConfig'));
@@ -19,6 +20,7 @@ function App() {
           <Suspense fallback={<LoadingState />}>
             <Routes>
               <Route path='/' element={<SignUp />} />
+              <Route path='/login' element={<Login />} />
               <Route path='/analyzer' element={<Analyzer />} />
               <Route path='/analyze/:id' element={<Analyzer />} />
               <Route path='/ai-fix' element={<AIFix />} />

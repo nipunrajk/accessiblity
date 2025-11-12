@@ -1,109 +1,118 @@
-# AI Configuration Guide
+# 🤖 AI Setup - Production Ready!
 
-FastFix supports multiple AI providers for enhanced website analysis. Follow these simple steps to enable AI features:
+Explicit provider selection - perfect for new free APIs!
 
-## Quick Setup (Recommended)
-
-### Option 1: xAI Grok 4 Fast (Newest & Fastest - Recommended)
-
-1. Get API key from [OpenRouter](https://openrouter.ai/keys)
-2. Add to `.env` file: `VITE_OPENROUTER_API_KEY=your_key_here`
-3. Model `x-ai/grok-4-fast:free` is already selected in `src/config/aiConfig.js`
-4. That's it! Grok 4 Fast is free and lightning fast.
-
-### Option 2: Free AI Models (No API Key Required)
-
-1. Open `src/config/aiConfig.js`
-2. Set `openrouter.enabled = true` (already enabled by default)
-3. Works without API key but with rate limits.
-
-### Option 3: OpenAI (Most Popular)
-
-1. Get API key from [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Add to `.env` file: `VITE_OPENAI_API_KEY=your_key_here`
-3. In `src/config/aiConfig.js`, set `openai.enabled = true`
-
-### Option 4: Anthropic Claude (Great for Analysis)
-
-1. Get API key from [Anthropic Console](https://console.anthropic.com/)
-2. Add to `.env` file: `VITE_ANTHROPIC_API_KEY=your_key_here`
-3. In `src/config/aiConfig.js`, set `anthropic.enabled = true`
-
-## Configuration File
-
-Edit `src/config/aiConfig.js` to:
-
-- Enable/disable providers
-- Choose AI models
-- Set API keys directly (alternative to .env)
-
-## Supported Providers
-
-| Provider      | Free Option    | API Key Required | Best For              |
-| ------------- | -------------- | ---------------- | --------------------- |
-| xAI Grok 4    | ✅ Yes         | ✅ Yes\*         | Latest & fastest AI   |
-| OpenRouter    | ✅ Yes         | ❌ No            | Getting started       |
-| OpenAI        | ❌ No          | ✅ Yes           | High quality analysis |
-| Anthropic     | ❌ No          | ✅ Yes           | Detailed reasoning    |
-| Google Gemini | ❌ No          | ✅ Yes           | Fast responses        |
-| Groq          | ❌ No          | ✅ Yes           | Ultra-fast inference  |
-| Ollama        | ✅ Yes (Local) | ❌ No            | Privacy & offline use |
-
-\*xAI Grok 4 Fast is free but requires OpenRouter API key for better rate limits
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and add your API keys:
+## 🚀 One-Command Setup
 
 ```bash
-cp .env.example .env
-# Edit .env with your API keys
+# Setup with provider, API key, and optional model
+npm run ai:setup openrouter sk-or-v1-your-key x-ai/grok-4-fast:free
+npm run ai:setup openai sk-your-openai-key gpt-3.5-turbo
+npm run ai:setup anthropic sk-ant-your-key claude-3-haiku-20240307
+npm run ai:setup groq gsk_your-groq-key mixtral-8x7b-32768
+npm run ai:setup ollama  # No API key needed for local
+
+# Check current status
+npm run ai:status
 ```
 
-## Verification
+## 🔧 Manual Setup
 
-Check the browser console when running the app:
-
-- ✅ `🤖 AI Provider: openrouter (google/gemma-7b-it:free)` - AI is working
-- ℹ️ `AI not configured. Check src/config/aiConfig.js` - AI needs setup
-
-## Troubleshooting
-
-1. **No AI analysis showing?**
-
-   - Check `src/config/aiConfig.js` - ensure at least one provider is `enabled: true`
-   - Verify API keys in `.env` file or config file
-
-2. **API errors?**
-
-   - Check API key validity
-   - Verify you have credits/quota remaining
-   - Check browser console for detailed error messages
-
-3. **Want to switch providers?**
-   - Disable current provider: `enabled: false`
-   - Enable new provider: `enabled: true`
-   - Restart the development server
-
-## Local AI with Ollama
-
-For privacy and offline use:
+Add these 3 lines to your `.env` file:
 
 ```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Download a model
-ollama pull llama2
-
-# Enable in config
-# Set ollama.enabled = true in src/config/aiConfig.js
+VITE_AI_PROVIDER=openrouter
+VITE_AI_API_KEY=your_api_key_here
+VITE_AI_MODEL=x-ai/grok-4-fast:free
 ```
 
-## Cost Considerations
+## 📋 Available Providers
 
-- **Free**: OpenRouter free models, Ollama local models
-- **Low cost**: OpenAI GPT-3.5-turbo (~$0.002/1K tokens)
-- **Premium**: OpenAI GPT-4, Anthropic Claude 3 Opus
+### 🔥 OpenRouter (Recommended for Free Models)
 
-Most website analyses cost less than $0.01 per analysis with paid models.
+```bash
+VITE_AI_PROVIDER=openrouter
+VITE_AI_API_KEY=sk-or-v1-your-key
+```
+
+**Free Models**: `x-ai/grok-4-fast:free`, `x-ai/grok-beta:free`, `google/gemma-7b-it:free`  
+**Paid Models**: `openai/gpt-4`, `anthropic/claude-3-haiku`  
+**Get Key**: https://openrouter.ai/keys
+
+### 🧠 OpenAI (Direct API)
+
+```bash
+VITE_AI_PROVIDER=openai
+VITE_AI_API_KEY=sk-your-openai-key
+```
+
+**Models**: `gpt-3.5-turbo`, `gpt-4`, `gpt-4-turbo`  
+**Get Key**: https://platform.openai.com/api-keys
+
+### 🎭 Anthropic (Direct API)
+
+```bash
+VITE_AI_PROVIDER=anthropic
+VITE_AI_API_KEY=sk-ant-your-key
+```
+
+**Models**: `claude-3-haiku-20240307`, `claude-3-sonnet-20240229`  
+**Get Key**: https://console.anthropic.com/
+
+### ⚡ Groq (Fast Inference)
+
+```bash
+VITE_AI_PROVIDER=groq
+VITE_AI_API_KEY=gsk_your-groq-key
+```
+
+**Models**: `mixtral-8x7b-32768`, `llama2-70b-4096`  
+**Get Key**: https://console.groq.com/keys
+
+### 🏠 Ollama (Local)
+
+```bash
+VITE_AI_PROVIDER=ollama
+# No API key needed
+```
+
+**Models**: `llama2`, `llama3`, `mistral`, `codellama`  
+**Setup**: Install from https://ollama.ai/ then run `ollama pull llama2`
+
+## ➕ Adding New Providers
+
+When new free APIs become available, just add them to the provider configs:
+
+**Frontend** (`src/config/aiConfig.js`):
+
+```javascript
+newprovider: {
+  name: 'New Provider',
+  baseUrl: 'https://api.newprovider.com/v1',
+  authHeader: 'Authorization',
+  authPrefix: 'Bearer',
+  defaultModel: 'new-model-name',
+  type: 'openai', // or 'anthropic' or 'custom'
+},
+```
+
+**Backend** (`backend/services/aiProvider.js`):
+
+```javascript
+newprovider: {
+  name: 'New Provider',
+  baseUrl: 'https://api.newprovider.com/v1',
+  authHeader: 'Authorization',
+  authPrefix: 'Bearer',
+  defaultModel: 'new-model-name',
+  type: 'openai',
+},
+```
+
+Then use it:
+
+```bash
+npm run ai:setup newprovider your-api-key model-name
+```
+
+Perfect for the rapidly changing AI landscape! 🚀

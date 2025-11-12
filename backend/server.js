@@ -1,6 +1,16 @@
+// Load environment variables FIRST before any other imports
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '.env') });
+
+// Now import everything else
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import analysisController from './controllers/analysisController.js';
 import aiController from './controllers/aiController.js';
 import {
@@ -14,8 +24,6 @@ import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
 // Import screenshot routes (keeping the new functionality)
 import screenshotRoutes from './routes/screenshot.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,6 +63,18 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+  });
+});
+
+// Debug endpoint to check environment variables
+app.get('/debug/env', (req, res) => {
+  res.json({
+    AI_PROVIDER: process.env.AI_PROVIDER || 'Not set',
+    AI_API_KEY: process.env.AI_API_KEY
+      ? 'Set (length: ' + process.env.AI_API_KEY.length + ')'
+      : 'Not set',
+    AI_MODEL: process.env.AI_MODEL || 'Not set',
+    NODE_ENV: process.env.NODE_ENV || 'Not set',
   });
 });
 

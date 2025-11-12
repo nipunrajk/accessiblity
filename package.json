@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "unlighthouse": "npx @unlighthouse/cli --site localhost:5173"
+    "unlighthouse": "npx @unlighthouse/cli --site localhost:5173",
+    "ai:setup": "node scripts/ai-setup.js",
+    "ai:status": "node scripts/ai-setup.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.64.0",

@@ -30,6 +30,18 @@ function Analyzer() {
   // Check if AI is available
   const hasAIAvailable = isAIAvailable();
 
+  // Temporary debug - remove after testing
+  console.log('AI Status:', {
+    hasAIAvailable,
+    aiAnalysis,
+    aiLoading,
+    envVars: {
+      VITE_AI_PROVIDER: import.meta.env.VITE_AI_PROVIDER,
+      VITE_AI_API_KEY: import.meta.env.VITE_AI_API_KEY ? 'Set' : 'Not set',
+      VITE_AI_MODEL: import.meta.env.VITE_AI_MODEL,
+    },
+  });
+
   // TODO: Implement loadAnalysis for existing analysis IDs if needed
 
   return (

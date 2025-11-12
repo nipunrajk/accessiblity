@@ -146,11 +146,17 @@ Please provide a concise analysis in the following format:
 Keep the response clear and actionable, focusing on the most impactful improvements.
 `;
 
+      console.log('🚀 Invoking AI provider with prompt...');
       const analysis = await aiProvider.invoke(analysisPrompt);
       res.json({ analysis });
     } catch (error) {
       console.error('AI Analysis failed:', error);
-      res.status(500).json({ error: 'Failed to generate AI analysis' });
+      console.error('Error stack:', error.stack);
+      res.status(500).json({
+        error: 'Failed to generate AI analysis',
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      });
     }
   }
 
