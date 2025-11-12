@@ -1,6 +1,11 @@
+import logger from '../utils/logger.js';
+
 // Centralized error handling middleware
 export const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error('Request error', err, {
+    method: req.method,
+    path: req.path,
+  });
 
   // Default error response
   let statusCode = err.statusCode || 500;

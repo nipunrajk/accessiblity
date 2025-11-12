@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import { promises as fs } from 'fs';
+import logger from '../utils/logger.js';
 
 class ScreenshotService {
   constructor() {
@@ -70,7 +71,7 @@ class ScreenshotService {
         },
       };
     } catch (error) {
-      console.error('Screenshot capture failed:', error);
+      logger.error('Screenshot capture failed', error, { url });
       return {
         success: false,
         error: error.message,
@@ -149,10 +150,9 @@ class ScreenshotService {
               }
             }
           } catch (selectorError) {
-            console.warn(
-              `Could not highlight selector ${issue.selector}:`,
-              selectorError.message
-            );
+            logger.warn('Could not highlight selector', selectorError, {
+              selector: issue.selector,
+            });
           }
         }
       }
@@ -184,7 +184,7 @@ class ScreenshotService {
         },
       };
     } catch (error) {
-      console.error('Screenshot with highlights failed:', error);
+      logger.error('Screenshot with highlights failed', error, { url });
       return {
         success: false,
         error: error.message,
@@ -268,7 +268,7 @@ class ScreenshotService {
         await page.close();
       }
     } catch (error) {
-      console.error('Before/after comparison failed:', error);
+      logger.error('Before/after comparison failed', error, { url });
       return {
         success: false,
         error: error.message,

@@ -1,5 +1,6 @@
 import express from 'express';
 import screenshotService from '../services/screenshotService.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -28,7 +29,7 @@ router.post('/capture', async (req, res) => {
     const result = await screenshotService.captureScreenshot(url, options);
     res.json(result);
   } catch (error) {
-    console.error('Screenshot API error:', error);
+    logger.error('Screenshot API error', error, { url: req.body.url });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -64,7 +65,9 @@ router.post('/highlight', async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    console.error('Screenshot highlight API error:', error);
+    logger.error('Screenshot highlight API error', error, {
+      url: req.body.url,
+    });
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -100,7 +103,9 @@ router.post('/comparison', async (req, res) => {
     );
     res.json(result);
   } catch (error) {
-    console.error('Screenshot comparison API error:', error);
+    logger.error('Screenshot comparison API error', error, {
+      url: req.body.url,
+    });
     res.status(500).json({
       success: false,
       error: 'Internal server error',

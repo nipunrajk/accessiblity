@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/rest';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { JSDOM } from 'jsdom';
+import logger from '../utils/logger.js';
 
 const getGitConfig = async () => {
   try {
@@ -636,7 +637,7 @@ ${
       },
     });
   } catch (error) {
-    console.error('Error applying accessibility fixes:', error);
+    logger.error('Error applying accessibility fixes', error);
     res.status(500).json({
       error: `Failed to apply fixes: ${error.message}`,
     });

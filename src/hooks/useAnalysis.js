@@ -4,6 +4,7 @@ import { scanWebsiteElements } from '../services/domScanner';
 import { getFixSuggestions } from '../services/aiFix';
 import { isAIAvailable } from '../config/aiConfig';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
+import { TIMEOUTS } from '../constants/timeouts';
 import { useAnalysisContext } from '../contexts/AnalysisContext';
 import {
   handleError,
@@ -129,8 +130,8 @@ export const useAnalysis = () => {
           }),
           new Promise((_, reject) =>
             setTimeout(
-              () => reject(new Error('AI Analysis timeout after 30 seconds')),
-              30000
+              () => reject(new Error('AI Analysis timeout')),
+              TIMEOUTS.AI_ANALYSIS
             )
           ),
         ])
@@ -221,9 +222,8 @@ export const useAnalysis = () => {
                 }),
                 new Promise((_, reject) =>
                   setTimeout(
-                    () =>
-                      reject(new Error('AI Fixes timeout after 20 seconds')),
-                    20000
+                    () => reject(new Error('AI Fixes timeout')),
+                    TIMEOUTS.AI_FIXES
                   )
                 ),
               ]);
