@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -90,12 +91,11 @@ class AIProvider {
     const providerConfig = this.providers[provider];
 
     if (!providerConfig) {
-      console.error(
-        `❌ Unknown provider: ${provider}. Available: ${Object.keys(
-          this.providers
-        ).join(', ')}`
-      );
-      return { available: false, error: `Unknown provider: ${provider}` };
+      const errorMsg = `Unknown provider: ${provider}. Available: ${Object.keys(
+        this.providers
+      ).join(', ')}`;
+      logger.error(errorMsg);
+      return { available: false, error: errorMsg };
     }
 
     // Use provided model or default
@@ -121,10 +121,10 @@ class AIProvider {
 
   logStatus() {
     if (this.config.available) {
-      console.log(`🤖 AI: ${this.config.name} with ${this.config.model}`);
+      logger.aiProvider(this.config.name, this.config.model);
     } else {
-      console.log(
-        `❌ AI not available. ${
+      logger.warn(
+        `AI not available. ${
           this.config.error || 'Add AI_API_KEY to .env file.'
         }`
       );
@@ -169,9 +169,9 @@ class AIProvider {
       headers[this.config.authHeader] = authValue;
     }
 
-    console.log(
-      `🔄 Calling ${this.config.name} API with model: ${this.config.model}`
-    );
+    logger.debug(`Calling ${this.config.name} API`, {
+      model: this.config.model,
+    });
 
     const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -186,19 +186,18 @@ class AIProvider {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(
-        `❌ ${this.config.name} API error:`,
-        response.status,
-        response.statusText
-      );
-      console.error('Error body:', errorBody);
+      logger.error(`${this.config.name} API error`, null, {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody,
+      });
       throw new Error(
         `${this.config.name} API error: ${response.statusText} - ${errorBody}`
       );
     }
 
     const data = await response.json();
-    console.log(`✅ ${this.config.name} API response received`);
+    logger.debug(`${this.config.name} API response received`);
     return data.choices[0]?.message?.content || '';
   }
 

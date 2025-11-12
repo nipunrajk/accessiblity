@@ -6,6 +6,7 @@ import { STORAGE_KEYS } from '../constants';
 import jsPDF from 'jspdf';
 import IssueScreenshot from '../components/IssueScreenshot';
 import BeforeAfterComparison from '../components/BeforeAfterComparison';
+import logger from '../utils/logger';
 
 function AIFix() {
   const location = useLocation();
@@ -97,18 +98,14 @@ function AIFix() {
 
     // Use cached AI fixes if available
     if (cachedAiFixes) {
-      console.log('✅ Using cached AI fixes:', cachedAiFixes);
-      console.log(
-        '✅ Number of issues with AI fixes:',
-        Object.keys(cachedAiFixes).length
-      );
+      logger.success('Using cached AI fixes', {
+        issueCount: Object.keys(cachedAiFixes).length,
+      });
       setFixSuggestions(cachedAiFixes);
       setSuccessMessage('Using cached AI analysis results');
       setTimeout(() => setSuccessMessage(''), 3000);
     } else {
-      console.log(
-        '⚠️ No cached AI fixes available. Use "Regenerate Fixes" button to generate new suggestions.'
-      );
+      logger.debug('No cached AI fixes available');
     }
   }, [hasAIAvailable, cachedAiFixes]);
 
@@ -122,12 +119,13 @@ function AIFix() {
     try {
       setError(null);
       setLoadingStates((prev) => ({ ...prev, suggestions: true }));
-      console.log('🔄 Manually regenerating AI fixes for issues:', issues);
+      logger.info('Regenerating AI fixes', { issueCount: issues.length });
       const suggestions = await getFixSuggestions(issues);
       setFixSuggestions(suggestions);
       setSuccessMessage('Generated fresh AI recommendations');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
+      logger.error('Failed to regenerate AI fixes', err);
       setError(err.message);
     } finally {
       setLoadingStates((prev) => ({ ...prev, suggestions: false }));

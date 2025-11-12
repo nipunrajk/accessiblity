@@ -24,6 +24,7 @@ import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
 // Import screenshot routes (keeping the new functionality)
 import screenshotRoutes from './routes/screenshot.js';
+import logger from './utils/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -95,22 +96,17 @@ import screenshotService from './services/screenshotService.js';
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, shutting down gracefully');
   await screenshotService.closeBrowser();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logger.info('SIGINT received, shutting down gracefully');
   await screenshotService.closeBrowser();
   process.exit(0);
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 FastFix server running at http://localhost:${PORT}`);
-  console.log(`📊 Health check available at http://localhost:${PORT}/health`);
-  console.log(
-    `📸 Screenshot service available at http://localhost:${PORT}/api/screenshot`
-  );
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.serverStart(PORT, process.env.NODE_ENV || 'development');
 });
