@@ -9,7 +9,11 @@ export async function runLighthouseAnalysis(url, onProgress) {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({
+        url,
+        includeAxe: true, // Enable Axe-Core analysis
+        includeAI: true, // Keep AI analysis enabled
+      }),
     });
 
     if (!response.ok) {
@@ -59,33 +63,47 @@ export async function runLighthouseAnalysis(url, onProgress) {
             const data = JSON.parse(jsonStr);
 
             if (data.error) {
-              throw new Error(data.error);
+              console.error('Backend error:', data.error);
+              throw new Error(`Backend error: ${data.error}`);
             }
 
             if (data.done) {
               return {
+                // Combined scores (if Axe is enabled)
+                scores: data.scores || {
+                  lighthouse: data.accessibility?.score || 0,
+                  axe: 0,
+                  combined: data.accessibility?.score || 0,
+                  grade: 'F',
+                },
                 performance: {
-                  score: data.performance.score,
-                  issues: data.performance.issues,
-                  metrics: data.performance.metrics,
+                  score: data.performance?.score || 0,
+                  issues: data.performance?.issues || [],
+                  metrics: data.performance?.metrics || {},
                 },
                 accessibility: {
-                  score: data.accessibility.score,
-                  issues: data.accessibility.issues,
+                  score:
+                    data.accessibility?.score || data.scores?.combined || 0,
+                  issues: data.accessibility?.issues || [],
+                  violations: data.accessibility?.violations || [],
+                  incomplete: data.accessibility?.incomplete || [],
+                  passes: data.accessibility?.passes || [],
+                  wcagCompliance: data.accessibility?.wcagCompliance || null,
                 },
                 bestPractices: {
-                  score: data.bestPractices.score,
-                  issues: data.bestPractices.issues,
+                  score: data.bestPractices?.score || 0,
+                  issues: data.bestPractices?.issues || [],
                 },
                 seo: {
-                  score: data.seo.score,
-                  issues: data.seo.issues,
+                  score: data.seo?.score || 0,
+                  issues: data.seo?.issues || [],
                 },
                 scanStats: {
                   pagesScanned: data.scanStats?.pagesScanned || 0,
                   totalPages: data.scanStats?.totalPages || 0,
                   scannedUrls: data.scanStats?.scannedUrls || [],
                 },
+                axeEnabled: data.axeEnabled || false,
               };
             }
 

@@ -18,7 +18,8 @@ export default function ScreenshotButton({ url, issues }) {
     try {
       // Filter issues that have selectors
       const issuesWithSelectors = issues.filter(
-        (issue) => issue.selector || issue.node?.selector
+        (issue) =>
+          issue.selector || issue.nodes?.[0]?.selector || issue.node?.selector
       );
 
       if (issuesWithSelectors.length === 0) {
@@ -36,7 +37,11 @@ export default function ScreenshotButton({ url, issues }) {
         title: issue.title || issue.description || 'Issue',
         description: issue.description || issue.message || '',
         severity: issue.severity || issue.impact || 'medium',
-        selector: issue.selector || issue.node?.selector || '',
+        selector:
+          issue.selector ||
+          issue.nodes?.[0]?.selector ||
+          issue.node?.selector ||
+          '',
       }));
 
       await captureIssueScreenshots(url, formattedIssues);
@@ -160,11 +165,16 @@ export default function ScreenshotButton({ url, issues }) {
         <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm'>
           <p className='font-medium mb-1'>📊 Screenshot Availability</p>
           <p>
-            {issues.filter((i) => i.selector || i.node?.selector).length} of{' '}
-            {issues.length} issues have selectors and can be captured.
+            {
+              issues.filter(
+                (i) => i.selector || i.nodes?.[0]?.selector || i.node?.selector
+              ).length
+            }{' '}
+            of {issues.length} issues have selectors and can be captured.
           </p>
-          {issues.filter((i) => i.selector || i.node?.selector).length ===
-            0 && (
+          {issues.filter(
+            (i) => i.selector || i.nodes?.[0]?.selector || i.node?.selector
+          ).length === 0 && (
             <p className='mt-2 text-xs'>
               💡 Tip: Element-level issues from the DOM scanner include
               selectors. Lighthouse summary issues typically don't.

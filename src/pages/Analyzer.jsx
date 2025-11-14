@@ -12,6 +12,8 @@ import AILoadingState from '../components/AILoadingState';
 import IssueReport from '../components/IssueReport';
 import AccessibilityIssues from '../components/AccessibilityIssues';
 import ScreenshotButton from '../components/ScreenshotButton';
+import AxeViolations from '../components/AxeViolations';
+import AxeScoreCard from '../components/AxeScoreCard';
 
 function Analyzer() {
   const { id } = useParams();
@@ -240,6 +242,25 @@ function Analyzer() {
               )}
             </div>
 
+            {/* Enhanced Axe-Core Results */}
+            {results && results.scores && (
+              <AxeScoreCard
+                scores={results.scores}
+                wcagCompliance={results.accessibility?.wcagCompliance}
+              />
+            )}
+
+            {/* Axe-Core Violations */}
+            {results && results.accessibility?.violations && (
+              <AxeViolations
+                violations={results.accessibility.violations}
+                incomplete={results.accessibility?.incomplete}
+                passes={results.accessibility?.passes}
+                showPasses={false}
+              />
+            )}
+
+            {/* Fallback to Original Issue Report */}
             <IssueReport results={results} websiteUrl={websiteUrl} />
           </div>
         )}

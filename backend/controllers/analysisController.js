@@ -1,4 +1,6 @@
 import lighthouseService from '../services/lighthouseService.js';
+import axeService from '../services/accessibility/axeService.js';
+import resultsMerger from '../services/accessibility/resultsMerger.js';
 import puppeteer from 'puppeteer';
 import { validateUrl } from '../utils/validation.js';
 import aiAnalysisService from '../services/aiAnalysisService.js';
@@ -7,7 +9,7 @@ import logger from '../utils/logger.js';
 
 class AnalysisController {
   async analyzeWebsite(req, res) {
-    const { url, includeAI = true } = req.body;
+    const { url, includeAI = true, includeAxe = true } = req.body;
 
     // Validate URL
     const validatedUrl = validateUrl(url);
@@ -27,10 +29,20 @@ class AnalysisController {
       // Send initial progress
       sendProgress({ message: 'Starting website analysis...', progress: 0 });
 
-      const scanResults = await lighthouseService.scanWebsite(
-        validatedUrl,
-        sendProgress
-      );
+      // Run Lighthouse and optionally Axe in parallel
+      const analysisPromises = [
+        lighthouseService.scanWebsite(validatedUrl, sendProgress),
+      ];
+
+      if (includeAxe) {
+        sendProgress({
+          message: 'Running Axe-Core accessibility analysis...',
+          progress: 10,
+        });
+        analysisPromises.push(axeService.analyzePage(validatedUrl));
+      }
+
+      const [scanResults, axeResults] = await Promise.all(analysisPromises);
 
       const mainResults = scanResults.urls[0]?.scores || {
         performance: { score: 0 },
@@ -39,14 +51,38 @@ class AnalysisController {
         seo: { score: 0 },
       };
 
-      // Send lighthouse results first
+      // Merge results if Axe was included
+      let finalResults = mainResults;
+      if (includeAxe && axeResults) {
+        sendProgress({
+          message: 'Merging Lighthouse and Axe-Core results...',
+          progress: 60,
+        });
+
+        finalResults = resultsMerger.mergeResults(
+          {
+            url: validatedUrl,
+            ...mainResults,
+          },
+          axeResults
+        );
+
+        logger.success('Combined analysis completed', {
+          lighthouseScore: mainResults.accessibility?.score,
+          axeScore: axeService.calculateScore(axeResults).score,
+          combinedScore: finalResults.scores?.combined,
+        });
+      }
+
+      // Send lighthouse/combined results
       const baseResponse = {
-        ...mainResults,
+        ...finalResults,
         scanStats: {
           pagesScanned: scanResults.stats.pagesScanned,
           totalPages: scanResults.stats.totalPages,
           scannedUrls: scanResults.urls.map((u) => u.url),
         },
+        axeEnabled: includeAxe,
       };
 
       res.write(
