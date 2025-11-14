@@ -17,6 +17,7 @@
     "@langchain/google-genai": "^0.2.18",
     "@langchain/openai": "^0.6.13",
     "@octokit/rest": "^21.1.0",
+    "axe-puppeteer": "^1.1.1",
     "axios": "^1.12.2",
     "chrome-launcher": "^1.1.0",
     "cors": "^2.8.5",

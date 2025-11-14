@@ -62,14 +62,21 @@ class ScreenshotService {
       });
 
       if (options.waitFor) {
-        await page.waitForTimeout(options.waitFor);
+        await new Promise((resolve) => setTimeout(resolve, options.waitFor));
       }
 
-      const screenshotBuffer = await page.screenshot({
-        type: options.format || 'png',
+      const format = options.format || 'png';
+      const screenshotOptions = {
+        type: format,
         fullPage: options.fullPage || false,
-        quality: options.quality || 90,
-      });
+      };
+
+      // Quality only applies to JPEG
+      if (format === 'jpeg' || format === 'jpg') {
+        screenshotOptions.quality = options.quality || 90;
+      }
+
+      const screenshotBuffer = await page.screenshot(screenshotOptions);
 
       // Save to filesystem if requested
       let filePath = null;
@@ -190,13 +197,20 @@ class ScreenshotService {
         }
       }
 
-      await page.waitForTimeout(500);
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const screenshotBuffer = await page.screenshot({
-        type: options.format || 'png',
+      const format = options.format || 'png';
+      const screenshotOptions = {
+        type: format,
         fullPage: options.fullPage || false,
-        quality: options.quality || 90,
-      });
+      };
+
+      // Quality only applies to JPEG
+      if (format === 'jpeg' || format === 'jpg') {
+        screenshotOptions.quality = options.quality || 90;
+      }
+
+      const screenshotBuffer = await page.screenshot(screenshotOptions);
 
       // Save to filesystem if requested
       let filePath = null;
@@ -323,13 +337,12 @@ class ScreenshotService {
         }
 
         // Wait for scroll and render
-        await page.waitForTimeout(1000);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Take screenshot
         const screenshotBuffer = await page.screenshot({
           type: 'png',
           fullPage: false,
-          quality: 90,
         });
 
         // Save to filesystem
@@ -437,13 +450,20 @@ class ScreenshotService {
           }
         }
 
-        await page.waitForTimeout(1000);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const afterBuffer = await page.screenshot({
-          type: options.format || 'png',
+        const format = options.format || 'png';
+        const screenshotOptions = {
+          type: format,
           fullPage: options.fullPage || false,
-          quality: options.quality || 90,
-        });
+        };
+
+        // Quality only applies to JPEG
+        if (format === 'jpeg' || format === 'jpg') {
+          screenshotOptions.quality = options.quality || 90;
+        }
+
+        const afterBuffer = await page.screenshot(screenshotOptions);
 
         return {
           success: true,

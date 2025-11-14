@@ -20,6 +20,7 @@ import {
 import { analyzeRepository } from './controllers/repoAnalysisController.js';
 import { applyAccessibilityFixes } from './controllers/accessibilityFixController.js';
 import repoModificationRoutes from './routes/repoModificationRoutes.js';
+import axeRoutes from './routes/axeRoutes.js';
 import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
 // Import screenshot routes (keeping the new functionality)
@@ -54,6 +55,9 @@ app.post(
   asyncHandler(applyAccessibilityFixes)
 );
 app.use('/api/repo', repoModificationRoutes);
+
+// Axe-Core accessibility routes
+app.use('/api/axe', axeRoutes);
 
 // Screenshot routes (new functionality)
 app.use('/api/screenshot', screenshotRoutes);
