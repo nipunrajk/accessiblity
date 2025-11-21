@@ -29,7 +29,7 @@ class AxeService {
     this.defaultAxeConfig = {
       runOnly: {
         type: 'tag',
-        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'], // WCAG 2.1 AA compliance
+        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'], // WCAG 2.2 AA compliance
       },
       resultTypes: ['violations', 'incomplete', 'passes'],
       timeout: 30000,
@@ -177,8 +177,8 @@ class AxeService {
    */
   async analyzeByWCAGLevel(url, level = 'AA') {
     const tagMap = {
-      A: ['wcag2a', 'wcag21a'],
-      AA: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+      A: ['wcag2a', 'wcag21a', 'wcag22a'],
+      AA: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
       AAA: [
         'wcag2a',
         'wcag2aa',
@@ -186,6 +186,7 @@ class AxeService {
         'wcag21a',
         'wcag21aa',
         'wcag21aaa',
+        'wcag22aa', // WCAG 2.2 AA (no AAA tags yet in axe-core)
       ],
     };
 
