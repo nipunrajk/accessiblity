@@ -197,7 +197,7 @@ class AIProviderService {
 
     const data = await response.json();
     logger.debug(`${this.providerConfig.name} API response received`);
-    return data.choices[0]?.message?.content || '';
+    return data.choices?.[0]?.message?.content || '';
   }
 
   /**
@@ -241,7 +241,7 @@ class AIProviderService {
 
     const data = await response.json();
     logger.debug(`${this.providerConfig.name} API response received`);
-    return data.content[0]?.text || '';
+    return data.content?.[0]?.text || '';
   }
 
   /**
