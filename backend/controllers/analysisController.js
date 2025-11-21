@@ -1,13 +1,18 @@
-import lighthouseService from '../services/lighthouseService.js';
-import axeService from '../services/accessibility/axeService.js';
-import resultsMerger from '../services/accessibility/resultsMerger.js';
-import puppeteer from 'puppeteer';
+import analysisOrchestrator from '../services/analysis/analysis-orchestrator.service.js';
 import { validateUrl } from '../utils/validation.js';
-import aiAnalysisService from '../services/aiAnalysisService.js';
-import { PUPPETEER } from '../constants/index.js';
 import logger from '../utils/logger.js';
 
+/**
+ * Analysis Controller
+ * Handles HTTP concerns for analysis endpoints
+ * Delegates business logic to analysis orchestrator service
+ */
 class AnalysisController {
+  /**
+   * Analyze website endpoint
+   * POST /analyze
+   * Streams results via Server-Sent Events (SSE)
+   */
   async analyzeWebsite(req, res) {
     const { url, includeAI = true, includeAxe = true } = req.body;
 
@@ -22,210 +27,62 @@ class AnalysisController {
     });
 
     try {
+      // Progress callback for SSE
       const sendProgress = (progress) => {
         res.write(`data: ${JSON.stringify(progress)}\n\n`);
       };
 
-      // Send initial progress
-      sendProgress({ message: 'Starting website analysis...', progress: 0 });
-
-      // Run Lighthouse and optionally Axe in parallel
-      const analysisPromises = [
-        lighthouseService.scanWebsite(validatedUrl, sendProgress),
-      ];
-
-      if (includeAxe) {
-        sendProgress({
-          message: 'Running Axe-Core accessibility analysis...',
-          progress: 10,
-        });
-        analysisPromises.push(axeService.analyzePage(validatedUrl));
-      }
-
-      const [scanResults, axeResults] = await Promise.all(analysisPromises);
-
-      const mainResults = scanResults.urls[0]?.scores || {
-        performance: { score: 0 },
-        accessibility: { score: 0 },
-        bestPractices: { score: 0 },
-        seo: { score: 0 },
-      };
-
-      // Merge results if Axe was included
-      let finalResults = mainResults;
-      if (includeAxe && axeResults) {
-        sendProgress({
-          message: 'Merging Lighthouse and Axe-Core results...',
-          progress: 60,
-        });
-
-        finalResults = resultsMerger.mergeResults(
-          {
-            url: validatedUrl,
-            ...mainResults,
-          },
-          axeResults
-        );
-
-        logger.success('Combined analysis completed', {
-          lighthouseScore: mainResults.accessibility?.score,
-          axeScore: axeService.calculateScore(axeResults).score,
-          combinedScore: finalResults.scores?.combined,
-        });
-      }
-
-      // Send lighthouse/combined results
-      const baseResponse = {
-        ...finalResults,
-        scanStats: {
-          pagesScanned: scanResults.stats.pagesScanned,
-          totalPages: scanResults.stats.totalPages,
-          scannedUrls: scanResults.urls.map((u) => u.url),
-        },
-        axeEnabled: includeAxe,
-      };
-
-      res.write(
-        `data: ${JSON.stringify({ ...baseResponse, progress: 70 })}\n\n`
-      );
-
-      let aiInsights = null;
-      let aiFixes = null;
-
-      // Generate AI insights and fixes if requested
-      if (includeAI) {
-        sendProgress({ message: 'Generating AI insights...', progress: 75 });
-
-        aiInsights = await aiAnalysisService.generateInsights(mainResults);
-
-        if (aiInsights) {
-          res.write(
-            `data: ${JSON.stringify({
-              ...baseResponse,
-              aiInsights,
-              progress: 85,
-            })}\n\n`
-          );
-        }
-
-        // Generate AI fixes for issues if available
-        const allIssues = [];
-        scanResults.urls.forEach((urlResult) => {
-          if (urlResult.issues) {
-            allIssues.push(...urlResult.issues);
-          }
-        });
-
-        if (allIssues.length > 0) {
-          sendProgress({
-            message: 'Generating AI-powered fixes...',
-            progress: 90,
-          });
-
-          aiFixes = await aiAnalysisService.generateFixes(allIssues);
-
-          if (aiFixes) {
-            res.write(
-              `data: ${JSON.stringify({
-                ...baseResponse,
-                aiInsights,
-                aiFixes,
-                progress: 95,
-              })}\n\n`
-            );
-          }
-        }
-      }
+      // Delegate to orchestration service
+      const results = await analysisOrchestrator.analyzeWebsite({
+        url: validatedUrl,
+        includeAI,
+        includeAxe,
+        onProgress: sendProgress,
+      });
 
       // Send final response
-      res.write(
-        `data: ${JSON.stringify({
-          ...baseResponse,
-          aiInsights,
-          aiFixes,
-          done: true,
-          progress: 100,
-        })}\n\n`
-      );
+      res.write(`data: ${JSON.stringify(results)}\n\n`);
     } catch (error) {
       logger.error('Analysis failed', error, { url: validatedUrl });
       res.write(
-        `data: ${JSON.stringify({ error: 'Failed to analyze website' })}\n\n`
+        `data: ${JSON.stringify({
+          error: 'Failed to analyze website',
+          message: error.message,
+        })}\n\n`
       );
     }
 
     res.end();
   }
 
+  /**
+   * Scan DOM elements endpoint
+   * POST /api/scan-elements
+   */
   async scanElements(req, res) {
     try {
       const { url } = req.body;
 
-      const browser = await puppeteer.launch({
-        headless: PUPPETEER.HEADLESS,
-        args: PUPPETEER.ARGS,
+      // Validate URL
+      const validatedUrl = validateUrl(url);
+
+      // Delegate to element scanner service
+      const elementScanner = (
+        await import('../services/analysis/element-scanner.service.js')
+      ).default;
+      const elements = await elementScanner.scanElements(validatedUrl);
+
+      res.json({
+        success: true,
+        elements,
+        count: elements.length,
       });
-
-      const page = await browser.newPage();
-      await page.goto(url, { waitUntil: PUPPETEER.WAIT_UNTIL });
-
-      const elements = await page.evaluate(() => {
-        const getAllElements = (root) => {
-          const elements = [];
-          const walk = (node) => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              elements.push({
-                tag: node.tagName.toLowerCase(),
-                id: node.id || null,
-                classes: Array.from(node.classList || []),
-                textContent: node.textContent?.trim() || null,
-                attributes: Array.from(node.attributes || []).map((attr) => ({
-                  name: attr.name,
-                  value: attr.value,
-                })),
-                path: getXPath(node),
-                children: node.children.length,
-              });
-
-              Array.from(node.children).forEach(walk);
-            }
-          };
-
-          const getXPath = (node) => {
-            const parts = [];
-            while (node && node.nodeType === Node.ELEMENT_NODE) {
-              let idx = 0;
-              let sibling = node;
-              while (sibling) {
-                if (
-                  sibling.nodeType === Node.ELEMENT_NODE &&
-                  sibling.tagName === node.tagName
-                )
-                  idx++;
-                sibling = sibling.previousSibling;
-              }
-              const tag = node.tagName.toLowerCase();
-              parts.unshift(`${tag}[${idx}]`);
-              node = node.parentNode;
-            }
-            return parts.length ? '/' + parts.join('/') : '';
-          };
-
-          walk(root);
-          return elements;
-        };
-
-        return getAllElements(document.documentElement);
-      });
-
-      await browser.close();
-      logger.success('Element scanning completed', {
-        elementCount: elements.length,
-      });
-      res.json({ elements });
     } catch (error) {
-      logger.error('Error scanning elements', error, { url });
-      res.status(500).json({ error: error.message });
+      logger.error('Error scanning elements', error, { url: req.body.url });
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
     }
   }
 }

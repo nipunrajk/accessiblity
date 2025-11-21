@@ -1,5 +1,3 @@
-import MetricItem from './MetricItem';
-
 function SEOMetrics({ data }) {
   if (!data.issues) return null;
 

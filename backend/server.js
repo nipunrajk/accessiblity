@@ -26,21 +26,33 @@ import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 // Import screenshot routes (keeping the new functionality)
 import screenshotRoutes from './routes/screenshot.js';
 import logger from './utils/logger.js';
+import { config, validateConfig } from './config/index.js';
+
+// Validate configuration on startup
+try {
+  validateConfig();
+  logger.success('Configuration validated successfully');
+} catch (error) {
+  logger.error('Configuration validation failed', error);
+  process.exit(1);
+}
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.app.server.port;
 
 // Configure CORS
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5176',
-    credentials: true,
+    origin: config.app.cors.origin,
+    credentials: config.app.cors.credentials,
   })
 );
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: config.app.request.sizeLimit }));
+app.use(
+  express.urlencoded({ extended: true, limit: config.app.request.sizeLimit })
+);
 
 // Routes with async error handling
 app.post('/analyze', asyncHandler(analysisController.analyzeWebsite));
@@ -74,12 +86,12 @@ app.get('/health', (req, res) => {
 // Debug endpoint to check environment variables
 app.get('/debug/env', (req, res) => {
   res.json({
-    AI_PROVIDER: process.env.AI_PROVIDER || 'Not set',
-    AI_API_KEY: process.env.AI_API_KEY
-      ? 'Set (length: ' + process.env.AI_API_KEY.length + ')'
+    AI_PROVIDER: config.ai.provider || 'Not set',
+    AI_API_KEY: config.ai.apiKey
+      ? 'Set (length: ' + config.ai.apiKey.length + ')'
       : 'Not set',
-    AI_MODEL: process.env.AI_MODEL || 'Not set',
-    NODE_ENV: process.env.NODE_ENV || 'Not set',
+    AI_MODEL: config.ai.model || 'Not set',
+    NODE_ENV: config.app.server.env || 'Not set',
   });
 });
 
@@ -95,22 +107,46 @@ app.use('*', (req, res) => {
 // Global error handling middleware
 app.use(errorHandler);
 
-// Import screenshot service for graceful shutdown
+// Import services for graceful shutdown
 import screenshotService from './services/screenshotService.js';
+import browserPool from './services/browser-pool.service.js';
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  await screenshotService.closeBrowser();
-  process.exit(0);
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+  logger.info(`${signal} received, shutting down gracefully`);
+
+  try {
+    // Close screenshot service browser
+    await screenshotService.closeBrowser();
+
+    // Close browser pool
+    await browserPool.closeAll();
+
+    logger.success('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown', error);
+    process.exit(1);
+  }
+};
+
+// Register shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (error) => {
+  logger.error('Uncaught exception', error);
+  await gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  await screenshotService.closeBrowser();
-  process.exit(0);
+// Handle unhandled promise rejections
+process.on('unhandledRejection', async (reason, promise) => {
+  logger.error('Unhandled promise rejection', { reason, promise });
+  await gracefulShutdown('UNHANDLED_REJECTION');
 });
 
 app.listen(PORT, () => {
-  logger.serverStart(PORT, process.env.NODE_ENV || 'development');
+  logger.serverStart(PORT, config.app.server.env);
 });

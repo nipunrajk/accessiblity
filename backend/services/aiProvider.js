@@ -1,7 +1,5 @@
-import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
-
-dotenv.config();
+import { getAIProviderConfig } from '../config/index.js';
 
 // =============================================================================
 // 🤖 BACKEND AI PROVIDER - Production Ready!
@@ -14,109 +12,21 @@ dotenv.config();
 
 class AIProvider {
   constructor() {
-    // Provider configurations - easy to add new ones
-    this.providers = {
-      // OpenAI - Direct API
-      openai: {
-        name: 'OpenAI',
-        baseUrl: 'https://api.openai.com/v1',
-        authHeader: 'Authorization',
-        authPrefix: 'Bearer',
-        defaultModel: 'gpt-3.5-turbo',
-        type: 'openai',
-      },
-
-      // OpenRouter - Access to multiple models including free ones
-      openrouter: {
-        name: 'OpenRouter',
-        baseUrl: 'https://openrouter.ai/api/v1',
-        authHeader: 'Authorization',
-        authPrefix: 'Bearer',
-        defaultModel: 'x-ai/grok-4-fast:free',
-        type: 'openai', // Uses OpenAI-compatible API
-      },
-
-      // Anthropic - Direct API
-      anthropic: {
-        name: 'Anthropic',
-        baseUrl: 'https://api.anthropic.com/v1',
-        authHeader: 'x-api-key',
-        authPrefix: '',
-        defaultModel: 'claude-3-haiku-20240307',
-        type: 'anthropic',
-      },
-
-      // Groq - Fast inference
-      groq: {
-        name: 'Groq',
-        baseUrl: 'https://api.groq.com/openai/v1',
-        authHeader: 'Authorization',
-        authPrefix: 'Bearer',
-        defaultModel: 'mixtral-8x7b-32768',
-        type: 'openai', // Uses OpenAI-compatible API
-      },
-
-      // Ollama - Local models
-      ollama: {
-        name: 'Ollama',
-        baseUrl: 'http://localhost:11434',
-        authHeader: null, // No auth needed
-        authPrefix: '',
-        defaultModel: 'llama2',
-        type: 'ollama',
-      },
-
-      // Easy to add new providers for future free APIs
-      // Example:
-      // newprovider: {
-      //   name: 'New Provider',
-      //   baseUrl: 'https://api.newprovider.com/v1',
-      //   authHeader: 'Authorization',
-      //   authPrefix: 'Bearer',
-      //   defaultModel: 'new-model-name',
-      //   type: 'openai', // or 'anthropic' or 'custom'
-      // },
-    };
-
     this.config = this.getConfig();
     this.logStatus();
   }
 
   getConfig() {
-    const provider = process.env.AI_PROVIDER || 'openrouter'; // Default to OpenRouter for free models
-    const apiKey = process.env.AI_API_KEY || '';
-    const model = process.env.AI_MODEL || '';
-
-    // Get provider configuration
-    const providerConfig = this.providers[provider];
+    // Get configuration from centralized config module
+    const providerConfig = getAIProviderConfig();
 
     if (!providerConfig) {
-      const errorMsg = `Unknown provider: ${provider}. Available: ${Object.keys(
-        this.providers
-      ).join(', ')}`;
+      const errorMsg = 'AI provider configuration not available';
       logger.error(errorMsg);
       return { available: false, error: errorMsg };
     }
 
-    // Use provided model or default
-    const finalModel = model || providerConfig.defaultModel;
-
-    // Check if API key is needed
-    const needsApiKey = provider !== 'ollama';
-    const available = !needsApiKey || !!apiKey;
-
-    return {
-      provider,
-      name: providerConfig.name,
-      apiKey,
-      model: finalModel,
-      baseUrl: providerConfig.baseUrl,
-      authHeader: providerConfig.authHeader,
-      authPrefix: providerConfig.authPrefix,
-      type: providerConfig.type,
-      available,
-      needsApiKey,
-    };
+    return providerConfig;
   }
 
   logStatus() {

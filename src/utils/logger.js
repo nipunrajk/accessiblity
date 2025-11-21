@@ -11,9 +11,23 @@ const LOG_LEVELS = {
 };
 
 class Logger {
-  constructor() {
-    this.isDevelopment = import.meta.env.MODE === 'development';
+  constructor(config = null) {
+    // Allow config to be passed in, or determine from environment
+    this.config = config;
+    this.isDevelopment = this.getEnvironment() === 'development';
     this.level = this.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
+  }
+
+  /**
+   * Get environment mode
+   * @returns {string} Environment mode
+   */
+  getEnvironment() {
+    if (this.config) {
+      return this.config.mode;
+    }
+    // Fallback for early initialization before config is loaded
+    return import.meta.env.MODE || 'production';
   }
 
   /**

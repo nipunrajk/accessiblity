@@ -1,13 +1,54 @@
+/**
+ * useScreenshots Hook
+ * Handles screenshot capture and management for accessibility issues
+ */
+
 import { useState } from 'react';
 import screenshotService from '../services/screenshotService';
 
+/**
+ * @typedef {Object} Screenshot
+ * @property {string} screenshot - Base64 encoded screenshot data
+ * @property {string} filename - Screenshot filename
+ * @property {Object} issue - Associated issue object
+ */
+
+/**
+ * @typedef {Object} ScreenshotOptions
+ * @property {number} [width] - Screenshot width
+ * @property {number} [height] - Screenshot height
+ * @property {boolean} [fullPage] - Capture full page
+ */
+
+/**
+ * Custom hook for capturing and managing screenshots
+ * @returns {Object} Screenshot state and methods
+ *
+ * @example
+ * const { captureIssueScreenshots, loading, screenshots } = useScreenshots();
+ *
+ * const result = await captureIssueScreenshots('https://example.com', issues);
+ * console.log(`Captured ${screenshots.length} screenshots`);
+ */
 export const useScreenshots = () => {
   const [loading, setLoading] = useState(false);
   const [screenshots, setScreenshots] = useState([]);
   const [error, setError] = useState(null);
 
   /**
-   * Capture issue-wise screenshots
+   * Capture individual screenshots for each issue
+   * @param {string} url - Website URL
+   * @param {Array} issues - Array of issues to capture
+   * @param {ScreenshotOptions} options - Screenshot options
+   * @returns {Promise<Object>} Capture result with screenshots array
+   * @throws {Error} When screenshot capture fails
+   *
+   * @example
+   * const result = await captureIssueScreenshots(
+   *   'https://example.com',
+   *   issues,
+   *   { fullPage: false }
+   * );
    */
   const captureIssueScreenshots = async (url, issues, options = {}) => {
     setLoading(true);
@@ -37,6 +78,18 @@ export const useScreenshots = () => {
 
   /**
    * Capture single screenshot with all issues highlighted
+   * @param {string} url - Website URL
+   * @param {Array} issues - Array of issues to highlight
+   * @param {ScreenshotOptions} options - Screenshot options
+   * @returns {Promise<Object>} Capture result with single screenshot
+   * @throws {Error} When screenshot capture fails
+   *
+   * @example
+   * const result = await captureWithHighlights(
+   *   'https://example.com',
+   *   issues,
+   *   { fullPage: true }
+   * );
    */
   const captureWithHighlights = async (url, issues, options = {}) => {
     setLoading(true);
@@ -64,7 +117,11 @@ export const useScreenshots = () => {
   };
 
   /**
-   * Download screenshot
+   * Download a single screenshot
+   * @param {Screenshot} screenshot - Screenshot object to download
+   *
+   * @example
+   * downloadScreenshot(screenshots[0]);
    */
   const downloadScreenshot = (screenshot) => {
     try {
@@ -79,7 +136,11 @@ export const useScreenshots = () => {
   };
 
   /**
-   * Download all screenshots as zip (simplified - downloads one by one)
+   * Download all screenshots (downloads one by one with delay)
+   * @param {Array<Screenshot>} screenshots - Array of screenshots to download
+   *
+   * @example
+   * downloadAllScreenshots(screenshots);
    */
   const downloadAllScreenshots = (screenshots) => {
     screenshots.forEach((screenshot, index) => {
@@ -90,7 +151,7 @@ export const useScreenshots = () => {
   };
 
   /**
-   * Clear screenshots
+   * Clear all screenshots and error state
    */
   const clearScreenshots = () => {
     setScreenshots([]);

@@ -1,8 +1,10 @@
+import { config } from '../config/index.js';
+
 // API Configuration
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
-  TIMEOUT: 30000,
-  RETRY_ATTEMPTS: 3,
+  BASE_URL: config.api.baseUrl,
+  TIMEOUT: config.api.timeout,
+  RETRY_ATTEMPTS: config.api.retryAttempts,
 };
 
 // Score Thresholds

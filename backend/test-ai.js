@@ -7,37 +7,43 @@ const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '.env') });
 
+// Import config module
+import { config, getAIProviderConfig } from './config/index.js';
+
 console.log('Testing AI Provider Configuration...\n');
-console.log('Environment Variables:');
-console.log('AI_PROVIDER:', process.env.AI_PROVIDER);
+console.log('Configuration:');
+console.log('AI_PROVIDER:', config.ai.provider);
 console.log(
   'AI_API_KEY:',
-  process.env.AI_API_KEY
-    ? `${process.env.AI_API_KEY.substring(0, 10)}...`
-    : 'NOT SET'
+  config.ai.apiKey ? `${config.ai.apiKey.substring(0, 10)}...` : 'NOT SET'
 );
-console.log('AI_MODEL:', process.env.AI_MODEL);
+console.log('AI_MODEL:', config.ai.model);
 console.log('\n');
 
 // Test the AI provider
 async function testAI() {
   try {
-    const response = await fetch(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.AI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: process.env.AI_MODEL,
-          messages: [{ role: 'user', content: 'Say "Hello, AI is working!"' }],
-          temperature: 0.7,
-          max_tokens: 50,
-        }),
-      }
-    );
+    const providerConfig = getAIProviderConfig();
+
+    if (!providerConfig || !providerConfig.available) {
+      console.error('❌ AI provider not available');
+      return;
+    }
+
+    const response = await fetch(`${providerConfig.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        [providerConfig.authHeader]:
+          `${providerConfig.authPrefix} ${providerConfig.apiKey}`.trim(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: providerConfig.model,
+        messages: [{ role: 'user', content: 'Say "Hello, AI is working!"' }],
+        temperature: 0.7,
+        max_tokens: 50,
+      }),
+    });
 
     console.log('Response status:', response.status, response.statusText);
 

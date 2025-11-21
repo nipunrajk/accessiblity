@@ -3,9 +3,9 @@
  * Run with: node backend/test-axe.js
  */
 
-import axeService from './services/accessibility/axeService.js';
+import axeService from './services/analysis/axe.service.js';
 import axeResultsParser from './services/accessibility/axeResultsParser.js';
-import resultsMerger from './services/accessibility/resultsMerger.js';
+import resultsMerger from './services/analysis/results-merger.service.js';
 import logger from './utils/logger.js';
 
 const TEST_URL = 'https://www.w3.org/WAI/demos/bad/'; // Intentionally inaccessible site

@@ -127,17 +127,20 @@ export function handleError(error, req, res) {
 
   // Handle unknown errors
   const statusCode = error.statusCode || StatusCodes.INTERNAL_ERROR;
-  const message =
-    process.env.NODE_ENV === 'development'
-      ? error.message
-      : 'An unexpected error occurred';
+
+  // Get environment from process.env
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  const message = isDevelopment
+    ? error.message
+    : 'An unexpected error occurred';
 
   res.status(statusCode).json({
     success: false,
     error: {
       type: ErrorTypes.INTERNAL,
       message,
-      ...(process.env.NODE_ENV === 'development' && {
+      ...(isDevelopment && {
         stack: error.stack,
       }),
     },

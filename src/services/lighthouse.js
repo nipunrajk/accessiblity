@@ -40,16 +40,6 @@ export async function runLighthouseAnalysis(url, onProgress) {
           try {
             const jsonStr = line.slice(6).trim();
 
-            // Debug logging
-            console.log('Received SSE data length:', jsonStr.length);
-            if (jsonStr.length > 1000) {
-              console.log('Start of data:', jsonStr.substring(0, 100));
-              console.log(
-                'End of data:',
-                jsonStr.substring(jsonStr.length - 100)
-              );
-            }
-
             // Validate JSON structure
             if (!jsonStr.startsWith('{') || !jsonStr.endsWith('}')) {
               console.error('Malformed JSON structure:', {

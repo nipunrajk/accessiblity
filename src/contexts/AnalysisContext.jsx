@@ -1,6 +1,8 @@
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { STORAGE_KEYS } from '../constants';
+import storageService from '../services/storage/storage.service.js';
+import logger from '../utils/logger.js';
 
 // Analysis state reducer
 const analysisReducer = (state, action) => {
@@ -67,45 +69,42 @@ export function AnalysisProvider({ children }) {
       const isFreshLogin = sessionStorage.getItem('freshLogin');
       if (isFreshLogin) {
         sessionStorage.removeItem('freshLogin'); // Clear the flag
-        console.log('🔄 Fresh login detected - starting with clean state');
+        logger.info('Fresh login detected - starting with clean state');
         return; // Don't load persisted data
       }
 
       try {
         const persistedData = {};
 
-        const savedResults = localStorage.getItem(
-          STORAGE_KEYS.ANALYSIS_RESULTS
-        );
-        const savedAiAnalysis = localStorage.getItem(STORAGE_KEYS.AI_ANALYSIS);
-        const savedAiFixes = localStorage.getItem(STORAGE_KEYS.AI_FIXES);
-        const savedScanStats = localStorage.getItem(STORAGE_KEYS.SCAN_STATS);
-        const savedScannedElements = localStorage.getItem(
+        // Use storage service to get persisted data
+        const savedResults = storageService.get(STORAGE_KEYS.ANALYSIS_RESULTS);
+        const savedAiAnalysis = storageService.get(STORAGE_KEYS.AI_ANALYSIS);
+        const savedAiFixes = storageService.get(STORAGE_KEYS.AI_FIXES);
+        const savedScanStats = storageService.get(STORAGE_KEYS.SCAN_STATS);
+        const savedScannedElements = storageService.get(
           STORAGE_KEYS.SCANNED_ELEMENTS
         );
-        const savedElementIssues = localStorage.getItem(
+        const savedElementIssues = storageService.get(
           STORAGE_KEYS.ELEMENT_ISSUES
         );
-        const savedWebsiteUrl = localStorage.getItem(STORAGE_KEYS.WEBSITE_URL);
+        const savedWebsiteUrl = storageService.get(STORAGE_KEYS.WEBSITE_URL);
 
-        if (savedResults) persistedData.results = JSON.parse(savedResults);
-        if (savedAiAnalysis)
-          persistedData.aiAnalysis = JSON.parse(savedAiAnalysis);
-        if (savedAiFixes) persistedData.aiFixes = JSON.parse(savedAiFixes);
-        if (savedScanStats)
-          persistedData.scanStats = JSON.parse(savedScanStats);
+        if (savedResults) persistedData.results = savedResults;
+        if (savedAiAnalysis) persistedData.aiAnalysis = savedAiAnalysis;
+        if (savedAiFixes) persistedData.aiFixes = savedAiFixes;
+        if (savedScanStats) persistedData.scanStats = savedScanStats;
         if (savedScannedElements)
-          persistedData.scannedElements = JSON.parse(savedScannedElements);
+          persistedData.scannedElements = savedScannedElements;
         if (savedElementIssues)
-          persistedData.elementIssues = JSON.parse(savedElementIssues);
+          persistedData.elementIssues = savedElementIssues;
         if (savedWebsiteUrl) persistedData.websiteUrl = savedWebsiteUrl;
 
         if (Object.keys(persistedData).length > 0) {
           dispatch({ type: 'LOAD_PERSISTED_DATA', payload: persistedData });
-          console.log('📊 Restored previous analysis data');
+          logger.success('Restored previous analysis data');
         }
       } catch (error) {
-        console.error('Error loading persisted data:', error);
+        logger.error('Error loading persisted data', error);
         // Clear corrupted data
         clearPersistedData();
       }
@@ -116,19 +115,18 @@ export function AnalysisProvider({ children }) {
 
   // Helper function to persist data
   const persistData = (key, data) => {
-    try {
-      if (data !== null && data !== undefined) {
-        localStorage.setItem(key, JSON.stringify(data));
+    if (data !== null && data !== undefined) {
+      const success = storageService.set(key, data);
+      if (!success) {
+        logger.warn('Failed to persist data', { key });
       }
-    } catch (error) {
-      console.error(`Error persisting ${key}:`, error);
     }
   };
 
   // Helper function to clear all persisted data
   const clearPersistedData = () => {
     Object.values(STORAGE_KEYS).forEach((key) => {
-      localStorage.removeItem(key);
+      storageService.remove(key);
     });
   };
 
@@ -163,7 +161,7 @@ export function AnalysisProvider({ children }) {
 
   useEffect(() => {
     if (state.websiteUrl)
-      localStorage.setItem(STORAGE_KEYS.WEBSITE_URL, state.websiteUrl);
+      persistData(STORAGE_KEYS.WEBSITE_URL, state.websiteUrl);
   }, [state.websiteUrl]);
 
   // Method to clear all analysis data (useful for logout/login)

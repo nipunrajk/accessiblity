@@ -1,18 +1,67 @@
+/**
+ * useAnalysis Hook
+ * Main orchestration hook for website analysis
+ * Coordinates Lighthouse, AI analysis, and DOM scanning
+ */
 import { useNavigate } from 'react-router-dom';
-import { runLighthouseAnalysis } from '../services/lighthouse';
-import { scanWebsiteElements } from '../services/domScanner';
-import { getFixSuggestions } from '../services/aiFix';
-import { isAIAvailable } from '../config/aiConfig';
-import { STORAGE_KEYS, API_CONFIG } from '../constants';
-import { TIMEOUTS } from '../constants/timeouts';
 import { useAnalysisContext } from '../contexts/AnalysisContext';
-import {
-  handleError,
-  createAIProviderError,
-  createAnalysisError,
-} from '../utils/errorHandler';
+import { useLighthouse } from './useLighthouse';
+import { useAIAnalysis } from './useAIAnalysis';
+import { useDOMScanner } from './useDOMScanner';
+import { handleError, createAnalysisError } from '../utils/errorHandler';
 import logger from '../utils/logger';
 
+const DEMO_URL = 'https://example-demo-site.com';
+const DEMO_AI_MESSAGE =
+  'This demo website shows common accessibility and performance issues. The missing alt text on images makes content inaccessible to screen readers. The large unoptimized images are slowing down page load times. Consider adding descriptive alt text and optimizing image sizes for better user experience.';
+
+/**
+ * @typedef {Object} AnalysisState
+ * @property {boolean} loading - Whether analysis is in progress
+ * @property {Object|null} results - Analysis results
+ * @property {string|null} error - Error message if analysis failed
+ * @property {string|null} aiAnalysis - AI-generated insights
+ * @property {boolean} aiLoading - Whether AI analysis is in progress
+ * @property {Object} scanStats - Scan statistics
+ * @property {Array} scannedElements - Scanned DOM elements
+ * @property {Array} elementIssues - Element-specific issues
+ * @property {Object|null} aiFixes - AI-generated fix suggestions
+ * @property {string} websiteUrl - Currently analyzed website URL
+ */
+
+/**
+ * @typedef {Object} AnalysisMethods
+ * @property {Function} runAnalysis - Run complete website analysis
+ * @property {Function} navigateToAiFix - Navigate to AI fix page
+ * @property {Function} clearAnalysis - Clear all analysis data
+ */
+
+/**
+ * Main analysis hook that orchestrates all analysis operations
+ * Coordinates Lighthouse analysis, AI insights, and DOM scanning
+ *
+ * @returns {AnalysisState & AnalysisMethods} Analysis state and methods
+ *
+ * @example
+ * const {
+ *   loading,
+ *   results,
+ *   error,
+ *   runAnalysis,
+ *   clearAnalysis
+ * } = useAnalysis();
+ *
+ * // Run analysis
+ * await runAnalysis('https://example.com');
+ *
+ * // Access results
+ * if (results) {
+ *   console.log('Performance score:', results.performance.score);
+ * }
+ *
+ * // Clear analysis
+ * clearAnalysis();
+ */
 export const useAnalysis = () => {
   const {
     loading,
@@ -30,248 +79,158 @@ export const useAnalysis = () => {
   } = useAnalysisContext();
 
   const navigate = useNavigate();
+  const { runLighthouse } = useLighthouse();
+  const { runAIAnalysis, generateFixes, aiAvailable } = useAIAnalysis();
+  const { scanElements } = useDOMScanner();
 
-  const runAnalysis = async (url) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
-    // Clear previous data
+  /**
+   * Clear analysis state
+   * @private
+   */
+  const clearState = () => {
+    const emptyStats = { pagesScanned: 0, totalPages: 0, scannedUrls: [] };
     dispatch({ type: 'SET_RESULTS', payload: null });
     dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
     dispatch({ type: 'SET_AI_FIXES', payload: null });
-    dispatch({
-      type: 'SET_SCAN_STATS',
-      payload: { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
-    });
-
-    // Clear persisted data for new analysis
+    dispatch({ type: 'SET_SCAN_STATS', payload: emptyStats });
     clearPersistedData();
+  };
 
-    // Handle demo/sample data case
-    if (url === 'demo' || url === 'sample') {
-      try {
-        // Load sample data from our demo file
-        const { sampleAnalysisResults } = await import('../data/sampleData.js');
+  /**
+   * Handle demo analysis with sample data
+   * @private
+   */
+  const handleDemoAnalysis = async () => {
+    try {
+      const { sampleAnalysisResults } = await import('../data/sampleData.js');
+      dispatch({ type: 'SET_WEBSITE_URL', payload: DEMO_URL });
+      dispatch({ type: 'SET_RESULTS', payload: sampleAnalysisResults });
+      dispatch({
+        type: 'SET_SCAN_STATS',
+        payload: { pagesScanned: 1, totalPages: 1, scannedUrls: [DEMO_URL] },
+      });
 
-        dispatch({
-          type: 'SET_WEBSITE_URL',
-          payload: 'https://example-demo-site.com',
-        });
-        dispatch({ type: 'SET_RESULTS', payload: sampleAnalysisResults });
-        dispatch({
-          type: 'SET_SCAN_STATS',
-          payload: {
-            pagesScanned: 1,
-            totalPages: 1,
-            scannedUrls: ['https://example-demo-site.com'],
-          },
-        });
-
-        // Add some demo AI analysis if AI is available
-        const hasAI = isAIAvailable();
-        if (hasAI) {
-          dispatch({ type: 'SET_AI_LOADING', payload: true });
-          // Simulate AI analysis delay
-          setTimeout(() => {
-            dispatch({
-              type: 'SET_AI_ANALYSIS',
-              payload:
-                'This demo website shows common accessibility and performance issues. The missing alt text on images makes content inaccessible to screen readers. The large unoptimized images are slowing down page load times. Consider adding descriptive alt text and optimizing image sizes for better user experience.',
-            });
-            dispatch({ type: 'SET_AI_LOADING', payload: false });
-          }, 2000);
-        }
-
-        const analysis = { id: 'demo-' + Date.now().toString() };
-        navigate(`/analyze/${analysis.id}`);
-        return;
-      } catch (demoError) {
-        console.error('Failed to load demo data:', demoError);
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to load demo data' });
-        return;
+      if (aiAvailable) {
+        dispatch({ type: 'SET_AI_LOADING', payload: true });
+        setTimeout(() => {
+          dispatch({ type: 'SET_AI_ANALYSIS', payload: DEMO_AI_MESSAGE });
+          dispatch({ type: 'SET_AI_LOADING', payload: false });
+        }, 2000);
       }
+
+      navigate(`/analyze/demo-${Date.now()}`);
+    } catch (demoError) {
+      logger.error('Failed to load demo data', demoError);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to load demo data' });
+    }
+  };
+
+  /**
+   * Run AI processing (analysis and fix generation) in parallel
+   * @private
+   * @param {Object} lighthouseResults - Lighthouse analysis results
+   * @param {string} url - Website URL
+   */
+  const runAIProcessing = async (lighthouseResults, url) => {
+    dispatch({ type: 'SET_AI_LOADING', payload: true });
+    try {
+      const startTime = performance.now();
+
+      // Run AI analysis, DOM scanning, and collect issues in parallel
+      const [aiAnalysisResult, elements] = await Promise.all([
+        runAIAnalysis(lighthouseResults),
+        scanElements(url),
+      ]);
+
+      const parallelTime = performance.now() - startTime;
+      logger.performance('Parallel AI processing completed', {
+        duration: parallelTime,
+      });
+
+      if (aiAnalysisResult) {
+        dispatch({ type: 'SET_AI_ANALYSIS', payload: aiAnalysisResult });
+      }
+      dispatch({ type: 'SET_SCANNED_ELEMENTS', payload: elements });
+      dispatch({ type: 'SET_ELEMENT_ISSUES', payload: elements });
+
+      // Collect all issues for fix generation
+      const allIssues = [
+        ...(lighthouseResults.performance?.issues || []),
+        ...(lighthouseResults.accessibility?.issues || []),
+        ...(lighthouseResults.bestPractices?.issues || []),
+        ...(lighthouseResults.seo?.issues || []),
+        ...elements,
+      ];
+
+      // Generate fixes if there are issues
+      if (allIssues.length > 0) {
+        const fixStartTime = performance.now();
+        const fixes = await generateFixes(allIssues);
+        const fixTime = performance.now() - fixStartTime;
+
+        logger.performance('AI fix generation completed', {
+          duration: fixTime,
+          issueCount: allIssues.length,
+        });
+
+        if (fixes) dispatch({ type: 'SET_AI_FIXES', payload: fixes });
+      }
+    } catch (error) {
+      logger.warn('AI processing error, continuing with basic analysis', {
+        error: error.message,
+      });
+    } finally {
+      dispatch({ type: 'SET_AI_LOADING', payload: false });
+    }
+  };
+
+  /**
+   * Run complete website analysis
+   * @param {string} url - Website URL to analyze (use 'demo' for sample data)
+   * @returns {Promise<void>}
+   * @throws {Error} When analysis fails
+   *
+   * @example
+   * // Analyze a website
+   * await runAnalysis('https://example.com');
+   *
+   * // Load demo data
+   * await runAnalysis('demo');
+   */
+  const runAnalysis = async (url) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    clearState();
+
+    if (url === 'demo' || url === 'sample') {
+      await handleDemoAnalysis();
+      return;
     }
 
     dispatch({ type: 'SET_WEBSITE_URL', payload: url });
 
     try {
-      const analysis = { id: Date.now().toString() };
+      const lighthouseResults = await runLighthouse(url, (progress) =>
+        dispatch({ type: 'SET_SCAN_STATS', payload: progress })
+      );
 
-      // Run Lighthouse analysis
-      const response = await runLighthouseAnalysis(url, (progress) => {
-        dispatch({ type: 'SET_SCAN_STATS', payload: progress });
+      dispatch({
+        type: 'SET_RESULTS',
+        payload: {
+          performance: lighthouseResults.performance,
+          accessibility: lighthouseResults.accessibility,
+          bestPractices: lighthouseResults.bestPractices,
+          seo: lighthouseResults.seo,
+        },
+      });
+      dispatch({
+        type: 'SET_SCAN_STATS',
+        payload: lighthouseResults.scanStats,
       });
 
-      const analysisResults = {
-        performance: response.performance,
-        accessibility: response.accessibility,
-        bestPractices: response.bestPractices,
-        seo: response.seo,
-      };
+      if (aiAvailable) await runAIProcessing(lighthouseResults, url);
 
-      dispatch({ type: 'SET_RESULTS', payload: analysisResults });
-
-      // Run AI analysis and DOM scanning in parallel for better performance
-      const hasAI = isAIAvailable();
-      if (hasAI) {
-        dispatch({ type: 'SET_AI_LOADING', payload: true });
-
-        // Run AI analysis and DOM scanning in parallel
-        const aiPromises = [];
-
-        // 1. AI Analysis Promise with timeout
-        const aiAnalysisPromise = Promise.race([
-          fetch('/api/ai-analysis', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ results: response }),
-          }),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error('AI Analysis timeout')),
-              TIMEOUTS.AI_ANALYSIS
-            )
-          ),
-        ])
-          .then(async (aiResponse) => {
-            if (aiResponse.ok) {
-              const { analysis } = await aiResponse.json();
-              dispatch({ type: 'SET_AI_ANALYSIS', payload: analysis });
-              logger.success('AI analysis completed');
-              return analysis;
-            } else {
-              const error = createAIProviderError(
-                'AI analysis failed',
-                new Error(aiResponse.statusText),
-                { status: aiResponse.status }
-              );
-              logger.warn(
-                'AI analysis unavailable, continuing without AI insights',
-                {
-                  status: aiResponse.status,
-                }
-              );
-              dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-              return null;
-            }
-          })
-          .catch((aiError) => {
-            const error = createAIProviderError('AI analysis failed', aiError);
-            logger.warn(
-              'AI analysis unavailable, continuing without AI insights',
-              {
-                error: aiError.message,
-              }
-            );
-            dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-            return null;
-          });
-
-        // 2. DOM Scanning Promise
-        const domScanPromise = scanWebsiteElements(url)
-          .then(({ elements }) => {
-            dispatch({ type: 'SET_SCANNED_ELEMENTS', payload: elements });
-            const elementIssuesData = Array.isArray(elements) ? elements : [];
-            dispatch({
-              type: 'SET_ELEMENT_ISSUES',
-              payload: elementIssuesData,
-            });
-            logger.success('DOM scanning completed', {
-              elementCount: elements.length,
-            });
-            return elements;
-          })
-          .catch((err) => {
-            logger.warn(
-              'Element scanning failed, continuing with basic analysis',
-              {
-                error: err.message,
-              }
-            );
-            dispatch({ type: 'SET_ELEMENT_ISSUES', payload: [] });
-            return [];
-          });
-
-        aiPromises.push(aiAnalysisPromise, domScanPromise);
-
-        // Wait for both AI analysis and DOM scanning to complete
-        try {
-          const [aiAnalysis, elements] = await Promise.all(aiPromises);
-
-          // 3. Generate AI fixes after we have all the data
-          const allIssues = [
-            ...(response?.performance?.issues || []),
-            ...(response?.accessibility?.issues || []),
-            ...(response?.bestPractices?.issues || []),
-            ...(response?.seo?.issues || []),
-            ...elements, // Add scanned elements as issues
-          ];
-
-          // Only generate AI fixes if we have issues and AI analysis succeeded
-          if (allIssues.length > 0) {
-            try {
-              const aiFixesResponse = await Promise.race([
-                fetch('/api/ai-fixes', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ issues: allIssues }),
-                }),
-                new Promise((_, reject) =>
-                  setTimeout(
-                    () => reject(new Error('AI Fixes timeout')),
-                    TIMEOUTS.AI_FIXES
-                  )
-                ),
-              ]);
-
-              if (aiFixesResponse.ok) {
-                const { suggestions } = await aiFixesResponse.json();
-                dispatch({ type: 'SET_AI_FIXES', payload: suggestions });
-                logger.success('AI fixes generated', {
-                  fixCount: Object.keys(suggestions).length,
-                });
-              } else {
-                logger.warn(
-                  'AI fixes unavailable, analysis complete without fix suggestions',
-                  {
-                    status: aiFixesResponse.status,
-                  }
-                );
-                dispatch({ type: 'SET_AI_FIXES', payload: null });
-              }
-            } catch (fixError) {
-              logger.warn(
-                'AI fixes unavailable, analysis complete without fix suggestions',
-                {
-                  error: fixError.message,
-                }
-              );
-              dispatch({ type: 'SET_AI_FIXES', payload: null });
-            }
-          }
-        } catch (error) {
-          logger.warn(
-            'AI processing encountered an error, continuing with basic analysis',
-            {
-              error: error.message,
-            }
-          );
-        }
-      }
-
-      const finalScanStats = {
-        pagesScanned:
-          response.scanStats?.pagesScanned || scanStats.pagesScanned,
-        totalPages: response.scanStats?.totalPages || scanStats.totalPages,
-        scannedUrls: response.scanStats?.scannedUrls || scanStats.scannedUrls,
-      };
-
-      dispatch({ type: 'SET_SCAN_STATS', payload: finalScanStats });
-      navigate(`/analyze/${analysis.id}`);
+      navigate(`/analyze/${Date.now()}`);
     } catch (err) {
       const error = createAnalysisError('Website analysis failed', err, {
         url,
@@ -285,6 +244,13 @@ export const useAnalysis = () => {
     }
   };
 
+  /**
+   * Navigate to AI fix page with current analysis data
+   * @param {string} [url] - Optional URL override
+   *
+   * @example
+   * navigateToAiFix();
+   */
   const navigateToAiFix = (url) => {
     const currentUrl = url || websiteUrl;
     const allIssues = [
@@ -301,12 +267,17 @@ export const useAnalysis = () => {
         websiteUrl: currentUrl,
         scanStats,
         scannedElements,
-        cachedAiFixes: aiFixes, // Pass the cached AI fixes
+        cachedAiFixes: aiFixes,
       },
     });
   };
 
-  // Function to clear all analysis data
+  /**
+   * Clear all analysis data and persisted state
+   *
+   * @example
+   * clearAnalysis();
+   */
   const clearAnalysis = () => {
     dispatch({ type: 'CLEAR_ALL' });
     clearPersistedData();

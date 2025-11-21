@@ -1,6 +1,7 @@
-import axios from "axios";
+import axios from 'axios';
+import { config } from '../config/index.js';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_URL = config.api.baseUrl;
 
 export const scanWebsiteElements = async (url) => {
   try {
@@ -8,7 +9,7 @@ export const scanWebsiteElements = async (url) => {
     const response = await axios.post(`${API_URL}/api/scan-elements`, { url });
     return response.data;
   } catch (error) {
-    throw new Error("Failed to scan website elements: " + error.message);
+    throw new Error('Failed to scan website elements: ' + error.message);
   }
 };
 

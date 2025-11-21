@@ -1,29 +1,23 @@
-import { useParams } from 'react-router-dom';
 import { useAnalysis } from '../hooks/useAnalysis';
 import { isAIAvailable } from '../config/aiConfig';
 import Header from '../components/Header';
 import AnalysisForm from '../components/AnalysisForm';
-import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import ScoreOverview from '../components/ScoreOverview';
 import AIInsights from '../components/AIInsights';
 import AILoadingState from '../components/AILoadingState';
-
 import IssueReport from '../components/IssueReport';
-import AccessibilityIssues from '../components/AccessibilityIssues';
 import ScreenshotButton from '../components/ScreenshotButton';
 import AxeViolations from '../components/AxeViolations';
 import AxeScoreCard from '../components/AxeScoreCard';
 
 function Analyzer() {
-  const { id } = useParams();
   const {
     loading,
     results,
     error,
     aiAnalysis,
     aiLoading,
-    scanStats,
     websiteUrl,
     elementIssues,
     runAnalysis,
@@ -33,20 +27,6 @@ function Analyzer() {
 
   // Check if AI is available
   const hasAIAvailable = isAIAvailable();
-
-  // Temporary debug - remove after testing
-  console.log('AI Status:', {
-    hasAIAvailable,
-    aiAnalysis,
-    aiLoading,
-    envVars: {
-      VITE_AI_PROVIDER: import.meta.env.VITE_AI_PROVIDER,
-      VITE_AI_API_KEY: import.meta.env.VITE_AI_API_KEY ? 'Set' : 'Not set',
-      VITE_AI_MODEL: import.meta.env.VITE_AI_MODEL,
-    },
-  });
-
-  // TODO: Implement loadAnalysis for existing analysis IDs if needed
 
   return (
     <div className='min-h-screen bg-white dark:bg-dark-bg transition-colors'>
@@ -79,13 +59,7 @@ function Analyzer() {
             {/* AI Insights - Only show if AI is available */}
             {hasAIAvailable ? (
               aiLoading ? (
-                <AILoadingState
-                  isLoading={aiLoading}
-                  onCancel={() => {
-                    // Allow users to continue without AI analysis if it's taking too long
-                    // This would need to be implemented in the useAnalysis hook
-                  }}
-                />
+                <AILoadingState isLoading={aiLoading} />
               ) : (
                 <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
               )

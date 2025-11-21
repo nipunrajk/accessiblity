@@ -1,7 +1,7 @@
-import axeService from '../services/accessibility/axeService.js';
+import axeService from '../services/analysis/axe.service.js';
 import axeResultsParser from '../services/accessibility/axeResultsParser.js';
-import resultsMerger from '../services/accessibility/resultsMerger.js';
-import lighthouseService from '../services/lighthouseService.js';
+import resultsMerger from '../services/analysis/results-merger.service.js';
+import lighthouseService from '../services/analysis/lighthouse.service.js';
 import { HTTP_STATUS, MESSAGES } from '../constants/index.js';
 import logger from '../utils/logger.js';
 import { asyncHandler } from '../middleware/errorHandler.js';

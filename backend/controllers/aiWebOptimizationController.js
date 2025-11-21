@@ -1,19 +1,20 @@
-import { Octokit } from "@octokit/rest";
-import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
-import path from "path";
-import { promises as fs } from "fs";
+import { Octokit } from '@octokit/rest';
+import { ChatOpenAI } from '@langchain/openai';
+import { PromptTemplate } from '@langchain/core/prompts';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { config } from '../config/index.js';
 
-const DEBUG = process.env.DEBUG === "true";
+const DEBUG = config.app.server.env === 'development';
 
 const getGitConfig = async () => {
   try {
-    const configPath = path.join(process.cwd(), "config.json");
-    const config = await fs.readFile(configPath, "utf8");
+    const configPath = path.join(process.cwd(), 'config.json');
+    const config = await fs.readFile(configPath, 'utf8');
     return JSON.parse(config);
   } catch (error) {
     throw new Error(
-      "Configuration not found. Please ensure config.json is set up"
+      'Configuration not found. Please ensure config.json is set up'
     );
   }
 };
@@ -21,9 +22,9 @@ const getGitConfig = async () => {
 const analyzeWebsitePerformance = async (content, fileType) => {
   try {
     const llm = new ChatOpenAI({
-      temperature: 0.7,
-      modelName: "gpt-4",
-      openAIApiKey: process.env.OPENAI_API_KEY,
+      temperature: config.ai.temperature,
+      modelName: config.ai.model || 'gpt-4',
+      openAIApiKey: config.ai.apiKey,
     });
 
     const promptTemplate = `
@@ -84,8 +85,8 @@ Return a JSON array of changes. Each object must have:
     const prompt = PromptTemplate.fromTemplate(promptTemplate);
 
     const formattedPrompt = await prompt.format({
-      fileType: fileType || "code",
-      content: content || "",
+      fileType: fileType || 'code',
+      content: content || '',
     });
 
     const response = await llm.invoke(formattedPrompt);
@@ -105,7 +106,7 @@ Return a JSON array of changes. Each object must have:
       const parsedResponse = JSON.parse(jsonContent);
 
       if (!Array.isArray(parsedResponse)) {
-        console.error("AI response is not an array:", parsedResponse);
+        console.error('AI response is not an array:', parsedResponse);
         return [];
       }
 
@@ -118,18 +119,18 @@ Return a JSON array of changes. Each object must have:
           !suggestion.category ||
           !suggestion.impact
         ) {
-          console.error("Invalid suggestion format:", suggestion);
+          console.error('Invalid suggestion format:', suggestion);
           return false;
         }
 
         const hasMinFile =
-          suggestion.replaceText.includes(".min.js") ||
-          suggestion.replaceText.includes(".min.css");
+          suggestion.replaceText.includes('.min.js') ||
+          suggestion.replaceText.includes('.min.css');
         const hasCDN =
-          suggestion.replaceText.includes("cdn.") ||
-          suggestion.replaceText.includes("//unpkg.com") ||
-          suggestion.replaceText.includes("//cdnjs.") ||
-          suggestion.replaceText.includes("//jsdelivr.");
+          suggestion.replaceText.includes('cdn.') ||
+          suggestion.replaceText.includes('//unpkg.com') ||
+          suggestion.replaceText.includes('//cdnjs.') ||
+          suggestion.replaceText.includes('//jsdelivr.');
 
         // Check if the suggestion modifies existing file paths
         const modifiesPath = (originalPath, newPath) => {
@@ -155,18 +156,18 @@ Return a JSON array of changes. Each object must have:
 
       if (DEBUG) {
         console.log(
-          "Filtered AI suggestions:",
+          'Filtered AI suggestions:',
           JSON.stringify(filteredResponse, null, 2)
         );
       }
       return filteredResponse;
     } catch (parseError) {
-      console.error("Failed to parse AI response:", response.content);
-      console.error("Parse error:", parseError);
+      console.error('Failed to parse AI response:', response.content);
+      console.error('Parse error:', parseError);
       return [];
     }
   } catch (error) {
-    console.error("Error in performance analysis:", error);
+    console.error('Error in performance analysis:', error);
     return [];
   }
 };
@@ -177,7 +178,7 @@ export const optimizeWebsite = async (req, res) => {
 
     if (!githubToken || !owner || !repo) {
       throw new Error(
-        "Missing required parameters: githubToken, owner, and repo are required"
+        'Missing required parameters: githubToken, owner, and repo are required'
       );
     }
 
@@ -213,23 +214,23 @@ export const optimizeWebsite = async (req, res) => {
       owner,
       repo,
       tree_sha: ref.object.sha,
-      recursive: "true",
+      recursive: 'true',
     });
 
     // Create a simplified results object
     const optimizationResults = {
       changes: [],
       pullRequest: {
-        url: "",
-        diffUrl: "",
+        url: '',
+        diffUrl: '',
       },
     };
 
     // Process files
     for (const file of tree.tree) {
-      if (file.type === "blob") {
+      if (file.type === 'blob') {
         const ext = path.extname(file.path).toLowerCase();
-        if ([".html", ".css", ".js"].includes(ext)) {
+        if (['.html', '.css', '.js'].includes(ext)) {
           try {
             if (DEBUG) {
               console.log(`Analyzing ${file.path}...`);
@@ -242,7 +243,7 @@ export const optimizeWebsite = async (req, res) => {
 
             const fileContent = Buffer.from(
               content.content,
-              "base64"
+              'base64'
             ).toString();
             const optimizations = await analyzeWebsitePerformance(
               fileContent,
@@ -251,7 +252,7 @@ export const optimizeWebsite = async (req, res) => {
 
             if (optimizations && optimizations.length > 0) {
               let newContent = fileContent;
-              const lines = fileContent.split("\n");
+              const lines = fileContent.split('\n');
 
               // Apply optimizations
               for (const opt of optimizations) {
@@ -269,7 +270,7 @@ export const optimizeWebsite = async (req, res) => {
                     if (lines[i].includes(opt.findText)) {
                       startLine = i + 1;
                       // Calculate endLine based on number of newlines in the original text
-                      const newLines = opt.findText.split("\n").length;
+                      const newLines = opt.findText.split('\n').length;
                       endLine = startLine + newLines - 1;
                       break;
                     }
@@ -301,7 +302,7 @@ export const optimizeWebsite = async (req, res) => {
                   repo,
                   path: file.path,
                   message: `AI Optimization: ${file.path}`,
-                  content: Buffer.from(newContent).toString("base64"),
+                  content: Buffer.from(newContent).toString('base64'),
                   branch: branchName,
                   sha: content.sha,
                 });
@@ -327,12 +328,12 @@ ${optimizationResults.changes
     - Impact: ${change.impact}
     - Reason: ${change.reason}`
   )
-  .join("\n\n")}`;
+  .join('\n\n')}`;
 
       const { data: pullRequest } = await octokit.pulls.create({
         owner,
         repo,
-        title: "AI-Powered Website Optimization",
+        title: 'AI-Powered Website Optimization',
         body: prBody,
         head: branchName,
         base: defaultBranch,
@@ -349,7 +350,7 @@ ${optimizationResults.changes
         data: optimizationResults,
       });
     } else {
-      throw new Error("No optimization opportunities found");
+      throw new Error('No optimization opportunities found');
     }
   } catch (error) {
     res.status(500).json({
@@ -365,7 +366,7 @@ export const applySpecificOptimization = async (req, res) => {
 
     if (!suggestion || !githubToken || !owner || !repo) {
       throw new Error(
-        "Missing required parameters: suggestion, githubToken, owner, and repo are required"
+        'Missing required parameters: suggestion, githubToken, owner, and repo are required'
       );
     }
 
@@ -399,8 +400,8 @@ export const applySpecificOptimization = async (req, res) => {
     const optimizationResults = {
       changes: [],
       pullRequest: {
-        url: "",
-        diffUrl: "",
+        url: '',
+        diffUrl: '',
       },
     };
 
@@ -409,14 +410,14 @@ export const applySpecificOptimization = async (req, res) => {
       owner,
       repo,
       tree_sha: ref.object.sha,
-      recursive: "true",
+      recursive: 'true',
     });
 
     // Process files to find optimization opportunities
     for (const file of tree.tree) {
-      if (file.type === "blob") {
+      if (file.type === 'blob') {
         const ext = path.extname(file.path).toLowerCase();
-        if ([".html", ".css", ".js"].includes(ext)) {
+        if (['.html', '.css', '.js'].includes(ext)) {
           try {
             const { data: content } = await octokit.repos.getContent({
               owner,
@@ -426,7 +427,7 @@ export const applySpecificOptimization = async (req, res) => {
 
             const fileContent = Buffer.from(
               content.content,
-              "base64"
+              'base64'
             ).toString();
 
             // Create a prompt that asks the AI to find and apply the suggestion
@@ -462,7 +463,7 @@ Return an empty array if no opportunities are found.`;
 
             if (optimizations && optimizations.length > 0) {
               let newContent = fileContent;
-              const lines = fileContent.split("\n");
+              const lines = fileContent.split('\n');
 
               for (const opt of optimizations) {
                 if (
@@ -476,7 +477,7 @@ Return an empty array if no opportunities are found.`;
                   for (let i = 0; i < lines.length; i++) {
                     if (lines[i].includes(opt.findText)) {
                       startLine = i + 1;
-                      endLine = startLine + opt.findText.split("\n").length - 1;
+                      endLine = startLine + opt.findText.split('\n').length - 1;
                       break;
                     }
                   }
@@ -505,7 +506,7 @@ Return an empty array if no opportunities are found.`;
                   repo,
                   path: file.path,
                   message: `AI Optimization: Applied "${suggestion}" to ${file.path}`,
-                  content: Buffer.from(newContent).toString("base64"),
+                  content: Buffer.from(newContent).toString('base64'),
                   branch: branchName,
                   sha: content.sha,
                 });
@@ -537,7 +538,7 @@ ${optimizationResults.changes
 + ${change.newCode}
 \`\`\``
   )
-  .join("\n\n")}`;
+  .join('\n\n')}`;
 
       const { data: pullRequest } = await octokit.pulls.create({
         owner,
@@ -558,7 +559,7 @@ ${optimizationResults.changes
         data: optimizationResults,
       });
     } else {
-      throw new Error("No opportunities found to apply this optimization");
+      throw new Error('No opportunities found to apply this optimization');
     }
   } catch (error) {
     res.status(500).json({
