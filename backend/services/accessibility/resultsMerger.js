@@ -4,6 +4,8 @@ import {
   getGrade,
   convertAxeViolationToIssue,
   convertAxeIncompleteToIssue,
+  convertPa11yIssueToCommon,
+  convertKeyboardIssueToCommon,
   deduplicateIssues,
   calculateWCAGCompliance,
 } from '../../utils/transformers.js';
@@ -140,12 +142,15 @@ class ResultsMerger {
     const axeIssues = axeViolations.map(convertAxeViolationToIssue);
     const incompleteIssues = axeIncomplete.map(convertAxeIncompleteToIssue);
 
+    // Convert Pa11y issues to common format
+    const pa11yFormattedIssues = pa11yIssues.map(convertPa11yIssueToCommon);
+
     // Deduplicate issues
     const allIssues = [
       ...lighthouseIssues,
       ...axeIssues,
       ...incompleteIssues,
-      ...pa11yIssues,
+      ...pa11yFormattedIssues,
     ];
     const uniqueIssues = deduplicateIssues(allIssues);
 

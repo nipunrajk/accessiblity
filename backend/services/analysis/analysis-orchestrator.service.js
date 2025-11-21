@@ -1,6 +1,8 @@
 import lighthouseService from './lighthouse.service.js';
 import axeService from './axe.service.js';
 import resultsMerger from './results-merger.service.js';
+import pa11yService from '../accessibility/pa11yService.js';
+import keyboardService from '../accessibility/keyboardService.js';
 import { aiAnalysisService } from '../ai/index.js';
 import logger from '../../utils/logger.js';
 import { createInternalError } from '../../utils/errorHandler.js';
@@ -17,43 +19,84 @@ class AnalysisOrchestratorService {
    * @param {string} options.url - URL to analyze
    * @param {boolean} options.includeAI - Include AI analysis
    * @param {boolean} options.includeAxe - Include Axe-Core analysis
+   * @param {boolean} options.includePa11y - Include Pa11y analysis
+   * @param {boolean} options.includeKeyboard - Include keyboard testing
    * @param {Function} options.onProgress - Progress callback
    * @returns {Promise<Object>} Complete analysis results
    */
   async analyzeWebsite(options) {
-    const { url, includeAI = true, includeAxe = true, onProgress } = options;
+    const {
+      url,
+      includeAI = true,
+      includeAxe = true,
+      includePa11y = true,
+      includeKeyboard = true,
+      onProgress,
+    } = options;
 
     logger.info('Starting website analysis orchestration', {
       url,
       includeAI,
       includeAxe,
+      includePa11y,
+      includeKeyboard,
     });
 
     try {
       // Send initial progress
       this._sendProgress(onProgress, {
-        message: 'Starting website analysis...',
+        message: 'Starting comprehensive website analysis...',
         progress: 0,
       });
 
-      // Run Lighthouse and optionally Axe in parallel
-      const analysisPromises = [this._runLighthouseAnalysis(url, onProgress)];
+      // Run all accessibility tools in parallel
+      const startTime = Date.now();
 
+      const lighthousePromise = this._runLighthouseAnalysis(url, onProgress);
+
+      let axePromise = null;
       if (includeAxe) {
         this._sendProgress(onProgress, {
           message: 'Running Axe-Core accessibility analysis...',
           progress: 10,
         });
-        analysisPromises.push(this._runAxeAnalysis(url));
+        axePromise = this._runAxeAnalysis(url);
       }
 
-      const startTime = Date.now();
-      const [scanResults, axeResults] = await Promise.all(analysisPromises);
+      let pa11yPromise = null;
+      if (includePa11y) {
+        this._sendProgress(onProgress, {
+          message: 'Running Pa11y multi-engine analysis...',
+          progress: 15,
+        });
+        pa11yPromise = this._runPa11yAnalysis(url);
+      }
+
+      let keyboardPromise = null;
+      if (includeKeyboard) {
+        this._sendProgress(onProgress, {
+          message: 'Running keyboard accessibility testing...',
+          progress: 20,
+        });
+        keyboardPromise = this._runKeyboardAnalysis(url);
+      }
+
+      // Wait for all enabled analyses to complete
+      const [scanResults, axeResults, pa11yResults, keyboardResults] =
+        await Promise.all([
+          lighthousePromise,
+          axePromise,
+          pa11yPromise,
+          keyboardPromise,
+        ]);
+
       const parallelAnalysisTime = Date.now() - startTime;
 
       logger.performance('Parallel analysis completed', {
         duration: parallelAnalysisTime,
         includedAxe: includeAxe,
+        includedPa11y: includePa11y,
+        includedKeyboard: includeKeyboard,
       });
 
       // Extract main results
@@ -64,12 +107,12 @@ class AnalysisOrchestratorService {
         seo: { score: 0 },
       };
 
-      // Merge results if Axe was included
+      // Merge all accessibility results
       let finalResults = mainResults;
       if (includeAxe && axeResults) {
         this._sendProgress(onProgress, {
-          message: 'Merging Lighthouse and Axe-Core results...',
-          progress: 60,
+          message: 'Merging accessibility results...',
+          progress: 50,
         });
 
         finalResults = resultsMerger.mergeResults(
@@ -77,17 +120,59 @@ class AnalysisOrchestratorService {
             url,
             ...mainResults,
           },
-          axeResults
+          axeResults,
+          pa11yResults
         );
 
         logger.success('Combined analysis completed', {
           lighthouseScore: mainResults.accessibility?.score,
           axeScore: axeService.calculateScore(axeResults).score,
+          pa11yScore: pa11yResults?.score?.score,
           combinedScore: finalResults.scores?.combined,
         });
       }
 
-      // Build base response
+      // Add keyboard issues to accessibility.issues array
+      if (keyboardResults && finalResults.accessibility) {
+        // Convert keyboard issues to common format and add to accessibility issues
+        const { convertKeyboardIssueToCommon } = await import(
+          '../../utils/transformers.js'
+        );
+
+        const allKeyboardIssues = [
+          ...(keyboardResults.interactiveElements?.issues || []),
+          ...(keyboardResults.focusIndicators?.issues || []),
+          ...(keyboardResults.keyboardTraps?.issues || []),
+          ...(keyboardResults.skipLinks?.issues || []),
+          ...(keyboardResults.focusManagement?.issues || []),
+        ];
+
+        const keyboardFormattedIssues = allKeyboardIssues.map(
+          convertKeyboardIssueToCommon
+        );
+
+        // Add keyboard issues to main accessibility issues
+        finalResults.accessibility.issues = [
+          ...finalResults.accessibility.issues,
+          ...keyboardFormattedIssues,
+        ];
+
+        // Update summary
+        finalResults.accessibility.summary.total +=
+          keyboardFormattedIssues.length;
+        finalResults.accessibility.summary.bySource.keyboard =
+          keyboardFormattedIssues.length;
+
+        // Keep full keyboard results for detailed view
+        finalResults.keyboard = keyboardResults;
+      }
+
+      if (pa11yResults && !includeAxe) {
+        // If Axe wasn't included, add Pa11y separately
+        finalResults.pa11y = pa11yResults;
+      }
+
+      // Build base response with all accessibility data
       const baseResponse = {
         ...finalResults,
         scanStats: {
@@ -95,6 +180,12 @@ class AnalysisOrchestratorService {
           totalPages: scanResults.stats.totalPages,
           scannedUrls: scanResults.urls.map((u) => u.url),
         },
+        toolsEnabled: {
+          axe: includeAxe,
+          pa11y: includePa11y,
+          keyboard: includeKeyboard,
+        },
+        // Legacy support
         axeEnabled: includeAxe,
       };
 
@@ -177,6 +268,40 @@ class AnalysisOrchestratorService {
 
     logger.success('Axe-Core analysis completed', {
       violations: results.violations.length,
+    });
+
+    return results;
+  }
+
+  /**
+   * Run Pa11y analysis
+   * @private
+   */
+  async _runPa11yAnalysis(url) {
+    logger.info('Running Pa11y analysis', { url });
+
+    const results = await pa11yService.analyzePage(url);
+
+    logger.success('Pa11y analysis completed', {
+      issues: results.summary.total,
+      errors: results.summary.errors,
+    });
+
+    return results;
+  }
+
+  /**
+   * Run Keyboard accessibility analysis
+   * @private
+   */
+  async _runKeyboardAnalysis(url) {
+    logger.info('Running keyboard accessibility analysis', { url });
+
+    const results = await keyboardService.analyzePage(url);
+
+    logger.success('Keyboard analysis completed', {
+      score: results.score.score,
+      issues: results.summary.totalIssues,
     });
 
     return results;

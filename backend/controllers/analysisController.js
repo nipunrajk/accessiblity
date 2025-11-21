@@ -14,7 +14,13 @@ class AnalysisController {
    * Streams results via Server-Sent Events (SSE)
    */
   async analyzeWebsite(req, res) {
-    const { url, includeAI = true, includeAxe = true } = req.body;
+    const {
+      url,
+      includeAI = true,
+      includeAxe = true,
+      includePa11y = true,
+      includeKeyboard = true,
+    } = req.body;
 
     // Validate URL
     const validatedUrl = validateUrl(url);
@@ -32,11 +38,13 @@ class AnalysisController {
         res.write(`data: ${JSON.stringify(progress)}\n\n`);
       };
 
-      // Delegate to orchestration service
+      // Delegate to orchestration service with all accessibility tools
       const results = await analysisOrchestrator.analyzeWebsite({
         url: validatedUrl,
         includeAI,
         includeAxe,
+        includePa11y,
+        includeKeyboard,
         onProgress: sendProgress,
       });
 

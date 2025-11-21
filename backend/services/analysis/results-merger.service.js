@@ -4,6 +4,7 @@ import {
   getGrade,
   convertAxeViolationToIssue,
   convertAxeIncompleteToIssue,
+  convertPa11yIssueToCommon,
   deduplicateIssues,
   calculateWCAGCompliance,
 } from '../../utils/transformers.js';
@@ -15,25 +16,31 @@ import {
  */
 class ResultsMerger {
   /**
-   * Merge Lighthouse and Axe results
+   * Merge Lighthouse, Axe, and Pa11y results
    * @param {Object} lighthouseResults - Lighthouse analysis results
    * @param {Object} axeResults - Axe-Core analysis results
+   * @param {Object} pa11yResults - Pa11y analysis results
    * @returns {Object} Merged results
    */
-  mergeResults(lighthouseResults, axeResults) {
-    logger.info('Merging Lighthouse and Axe-Core results');
+  mergeResults(lighthouseResults, axeResults, pa11yResults = null) {
+    logger.info('Merging Lighthouse, Axe-Core, and Pa11y results');
 
     const merged = {
       url: lighthouseResults.url || axeResults.url,
       timestamp: new Date().toISOString(),
 
       // Combined scores
-      scores: this.calculateCombinedScores(lighthouseResults, axeResults),
+      scores: this.calculateCombinedScores(
+        lighthouseResults,
+        axeResults,
+        pa11yResults
+      ),
 
       // Accessibility results
       accessibility: this.mergeAccessibilityResults(
         lighthouseResults.accessibility,
-        axeResults
+        axeResults,
+        pa11yResults
       ),
 
       // Keep other Lighthouse categories
@@ -51,6 +58,12 @@ class ResultsMerger {
           version: axeResults.testEngine?.version,
           testRunner: axeResults.testRunner,
         },
+        pa11y: pa11yResults
+          ? {
+              version: pa11yResults.version,
+              runner: pa11yResults.runner,
+            }
+          : null,
       },
     };
 
@@ -58,6 +71,7 @@ class ResultsMerger {
       totalIssues: merged.accessibility.issues.length,
       lighthouseIssues: lighthouseResults.accessibility?.issues?.length || 0,
       axeViolations: axeResults.violations?.length || 0,
+      pa11yIssues: pa11yResults?.issues?.length || 0,
     });
 
     return merged;
@@ -67,18 +81,31 @@ class ResultsMerger {
    * Calculate combined scores
    * @private
    */
-  calculateCombinedScores(lighthouseResults, axeResults) {
+  calculateCombinedScores(lighthouseResults, axeResults, pa11yResults = null) {
     const lighthouseScore = lighthouseResults.accessibility?.score || 0;
 
     // Calculate Axe score (0-100)
     const axeScore = this.calculateAxeScore(axeResults);
 
-    // Combined score (weighted average: 50% Lighthouse, 50% Axe)
-    const combinedScore = Math.round(lighthouseScore * 0.5 + axeScore * 0.5);
+    // Calculate Pa11y score if available
+    const pa11yScore = pa11yResults?.score?.score || 0;
+
+    // Combined score (weighted average)
+    let combinedScore;
+    if (pa11yResults) {
+      // 40% Lighthouse, 40% Axe, 20% Pa11y
+      combinedScore = Math.round(
+        lighthouseScore * 0.4 + axeScore * 0.4 + pa11yScore * 0.2
+      );
+    } else {
+      // 50% Lighthouse, 50% Axe
+      combinedScore = Math.round(lighthouseScore * 0.5 + axeScore * 0.5);
+    }
 
     return {
       lighthouse: Math.round(lighthouseScore),
       axe: Math.round(axeScore),
+      pa11y: pa11yResults ? Math.round(pa11yScore) : null,
       combined: combinedScore,
       grade: getGrade(combinedScore),
     };
@@ -97,23 +124,37 @@ class ResultsMerger {
    * Merge accessibility results
    * @private
    */
-  mergeAccessibilityResults(lighthouseAccessibility, axeResults) {
+  mergeAccessibilityResults(
+    lighthouseAccessibility,
+    axeResults,
+    pa11yResults = null
+  ) {
     const lighthouseIssues = lighthouseAccessibility?.issues || [];
     const axeViolations = axeResults.violations || [];
     const axeIncomplete = axeResults.incomplete || [];
+    const pa11yIssues = pa11yResults?.issues || [];
 
     // Convert Axe violations to common format
     const axeIssues = axeViolations.map(convertAxeViolationToIssue);
     const incompleteIssues = axeIncomplete.map(convertAxeIncompleteToIssue);
 
-    // Deduplicate issues
-    const allIssues = [...lighthouseIssues, ...axeIssues, ...incompleteIssues];
+    // Convert Pa11y issues to common format
+    const pa11yFormattedIssues = pa11yIssues.map(convertPa11yIssueToCommon);
+
+    // Deduplicate issues from all sources
+    const allIssues = [
+      ...lighthouseIssues,
+      ...axeIssues,
+      ...incompleteIssues,
+      ...pa11yFormattedIssues,
+    ];
     const uniqueIssues = deduplicateIssues(allIssues);
 
     return {
       score: this.calculateCombinedScores(
         { accessibility: lighthouseAccessibility },
-        axeResults
+        axeResults,
+        pa11yResults
       ).combined,
       issues: uniqueIssues,
       summary: {
@@ -128,14 +169,18 @@ class ResultsMerger {
           ).length,
           axe: uniqueIssues.filter((i) => i.detectedBy?.includes('axe-core'))
             .length,
-          both: uniqueIssues.filter(
-            (i) =>
-              i.detectedBy?.includes('lighthouse') &&
-              i.detectedBy?.includes('axe-core')
+          pa11y: uniqueIssues.filter((i) => i.detectedBy?.includes('pa11y'))
+            .length,
+          keyboard: uniqueIssues.filter((i) =>
+            i.detectedBy?.includes('keyboard')
           ).length,
+          multiple: uniqueIssues.filter((i) => i.detectedBy?.length > 1).length,
         },
       },
       wcagCompliance: calculateWCAGCompliance(uniqueIssues),
+      violations: axeResults.violations,
+      incomplete: axeResults.incomplete,
+      passes: axeResults.passes,
     };
   }
 }

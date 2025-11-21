@@ -192,6 +192,74 @@ export function convertAxeIncompleteToIssue(item) {
 }
 
 /**
+ * Convert Pa11y issue to common format
+ * @param {Object} issue - Pa11y issue object
+ * @returns {Object} Formatted issue object
+ */
+export function convertPa11yIssueToCommon(issue) {
+  // Map Pa11y type to severity
+  const severityMap = {
+    error: 'critical',
+    warning: 'serious',
+    notice: 'moderate',
+  };
+
+  return {
+    type: 'accessibility',
+    title: issue.message,
+    description: issue.message,
+    severity: severityMap[issue.type] || 'moderate',
+    impact: issue.type === 'error' ? 90 : issue.type === 'warning' ? 70 : 50,
+    detectedBy: ['pa11y'],
+    wcagCriteria: issue.wcagCriteria ? [issue.wcagCriteria] : [],
+    wcagLevel: issue.wcagLevel,
+    selector: issue.selector,
+    html: issue.context,
+    context: issue.context,
+    code: issue.code,
+    recommendations: [
+      {
+        description: issue.message,
+        implementation: `Fix the issue at: ${issue.selector}`,
+      },
+    ],
+  };
+}
+
+/**
+ * Convert Keyboard issue to common format
+ * @param {Object} issue - Keyboard issue object
+ * @returns {Object} Formatted issue object
+ */
+export function convertKeyboardIssueToCommon(issue) {
+  return {
+    type: 'accessibility',
+    title: issue.message,
+    description: issue.details || issue.message,
+    severity: issue.severity,
+    impact:
+      issue.severity === 'critical'
+        ? 90
+        : issue.severity === 'serious'
+        ? 70
+        : 50,
+    detectedBy: ['keyboard'],
+    wcagCriteria: [issue.wcag],
+    wcagLevel: 'AA', // Most keyboard issues are Level A or AA
+    selector: issue.selector,
+    element: issue.element,
+    text: issue.text,
+    className: issue.className,
+    recommendations: [
+      {
+        description: issue.recommendation,
+        implementation: issue.recommendation,
+      },
+    ],
+  };
+}
+
+/**
  * Deduplicate issues from multiple sources
  * @param {Array<Object>} issues - Array of issue objects
  * @returns {Array<Object>} Deduplicated array of issues
