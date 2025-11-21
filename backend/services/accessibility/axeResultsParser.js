@@ -1,4 +1,11 @@
 import logger from '../../utils/logger.js';
+import {
+  extractWCAGCriteria,
+  extractWCAGLevel,
+  parseAxeNode,
+  categorizeByPrinciple,
+  categorizeByImpact,
+} from '../../utils/transformers.js';
 
 /**
  * Axe Results Parser
@@ -21,15 +28,15 @@ class AxeResultsParser {
           help: violation.help,
           helpUrl: violation.helpUrl,
           tags: violation.tags,
-          wcagLevel: this.extractWCAGLevel(violation.tags),
-          wcagCriteria: this.extractWCAGCriteria(violation.tags),
-          nodes: violation.nodes.map((node) => this.parseNode(node)),
+          wcagLevel: extractWCAGLevel(violation.tags),
+          wcagCriteria: extractWCAGCriteria(violation.tags),
+          nodes: violation.nodes.map((node) => parseAxeNode(node)),
           nodeCount: violation.nodes.length,
         };
       } else {
         // Merge nodes from duplicate violations
         const additionalNodes = violation.nodes.map((node) =>
-          this.parseNode(node)
+          parseAxeNode(node)
         );
         acc[violation.id].nodes = [
           ...acc[violation.id].nodes,
@@ -56,139 +63,11 @@ class AxeResultsParser {
       help: item.help,
       helpUrl: item.helpUrl,
       tags: item.tags,
-      wcagLevel: this.extractWCAGLevel(item.tags),
-      nodes: item.nodes.map((node) => this.parseNode(node)),
+      wcagLevel: extractWCAGLevel(item.tags),
+      nodes: item.nodes.map((node) => parseAxeNode(node)),
       nodeCount: item.nodes.length,
       requiresManualCheck: true,
     }));
-  }
-
-  /**
-   * Parse individual node
-   * @param {Object} node - Axe node
-   * @returns {Object} Formatted node
-   */
-  parseNode(node) {
-    return {
-      html: node.html,
-      target: node.target,
-      failureSummary: node.failureSummary,
-      impact: node.impact,
-      // Extract specific failure details
-      any: node.any?.map((check) => ({
-        id: check.id,
-        message: check.message,
-        data: check.data,
-      })),
-      all: node.all?.map((check) => ({
-        id: check.id,
-        message: check.message,
-        data: check.data,
-      })),
-      none: node.none?.map((check) => ({
-        id: check.id,
-        message: check.message,
-        data: check.data,
-      })),
-    };
-  }
-
-  /**
-   * Extract WCAG level from tags
-   * @param {Array} tags - Axe tags
-   * @returns {string} WCAG level (A, AA, AAA)
-   */
-  extractWCAGLevel(tags) {
-    if (
-      tags.some((tag) => tag.includes('wcag2aaa') || tag.includes('wcag21aaa'))
-    ) {
-      return 'AAA';
-    }
-    if (
-      tags.some((tag) => tag.includes('wcag2aa') || tag.includes('wcag21aa'))
-    ) {
-      return 'AA';
-    }
-    if (tags.some((tag) => tag.includes('wcag2a') || tag.includes('wcag21a'))) {
-      return 'A';
-    }
-    return 'Unknown';
-  }
-
-  /**
-   * Extract WCAG criteria from tags
-   * @param {Array} tags - Axe tags
-   * @returns {Array} WCAG criteria (e.g., ['1.4.3', '2.4.7'])
-   */
-  extractWCAGCriteria(tags) {
-    const criteriaPattern = /wcag\d{3,4}/;
-    return tags
-      .filter((tag) => criteriaPattern.test(tag))
-      .map((tag) => {
-        // Convert wcag143 to 1.4.3
-        const match = tag.match(/wcag(\d)(\d)(\d+)/);
-        if (match) {
-          return `${match[1]}.${match[2]}.${match[3]}`;
-        }
-        return tag;
-      });
-  }
-
-  /**
-   * Categorize violations by WCAG principle
-   * @param {Array} violations - Parsed violations
-   * @returns {Object} Violations grouped by principle
-   */
-  categorizeByPrinciple(violations) {
-    const principles = {
-      perceivable: [],
-      operable: [],
-      understandable: [],
-      robust: [],
-      other: [],
-    };
-
-    violations.forEach((violation) => {
-      const criteria = violation.wcagCriteria[0];
-      if (!criteria) {
-        principles.other.push(violation);
-        return;
-      }
-
-      const principle = criteria.split('.')[0];
-      switch (principle) {
-        case '1':
-          principles.perceivable.push(violation);
-          break;
-        case '2':
-          principles.operable.push(violation);
-          break;
-        case '3':
-          principles.understandable.push(violation);
-          break;
-        case '4':
-          principles.robust.push(violation);
-          break;
-        default:
-          principles.other.push(violation);
-      }
-    });
-
-    return principles;
-  }
-
-  /**
-   * Categorize violations by impact
-   * @param {Array} violations - Parsed violations
-   * @returns {Object} Violations grouped by impact
-   */
-  categorizeByImpact(violations) {
-    return {
-      critical: violations.filter((v) => v.impact === 'critical'),
-      serious: violations.filter((v) => v.impact === 'serious'),
-      moderate: violations.filter((v) => v.impact === 'moderate'),
-      minor: violations.filter((v) => v.impact === 'minor'),
-    };
   }
 
   /**
@@ -333,8 +212,8 @@ class AxeResultsParser {
       },
       violations,
       incomplete,
-      byPrinciple: this.categorizeByPrinciple(violations),
-      byImpact: this.categorizeByImpact(violations),
+      byPrinciple: categorizeByPrinciple(violations),
+      byImpact: categorizeByImpact(violations),
       testEngine: axeResults.testEngine,
       wcagLevels: this.getWCAGLevelSummary(violations),
     };

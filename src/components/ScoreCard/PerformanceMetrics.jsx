@@ -1,5 +1,3 @@
-import MetricItem from './MetricItem';
-
 function PerformanceMetrics({ data }) {
   if (!data.metrics) return null;
 

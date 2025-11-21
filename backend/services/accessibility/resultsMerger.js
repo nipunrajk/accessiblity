@@ -1,31 +1,50 @@
 import logger from '../../utils/logger.js';
+import {
+  calculateWeightedScore,
+  getGrade,
+  convertAxeViolationToIssue,
+  convertAxeIncompleteToIssue,
+  convertPa11yIssueToCommon,
+  convertKeyboardIssueToCommon,
+  deduplicateIssues,
+  calculateWCAGCompliance,
+} from '../../utils/transformers.js';
 
 /**
  * Results Merger
- * Combines Lighthouse and Axe-Core results into unified report
+ * Combines Lighthouse, Axe-Core, and Pa11y results into unified report
  * Handles deduplication and score calculation
  */
 class ResultsMerger {
   /**
-   * Merge Lighthouse and Axe results
+   * Merge Lighthouse, Axe, and Pa11y results
    * @param {Object} lighthouseResults - Lighthouse analysis results
    * @param {Object} axeResults - Axe-Core analysis results
+   * @param {Object} pa11yResults - Pa11y analysis results (optional)
    * @returns {Object} Merged results
    */
-  mergeResults(lighthouseResults, axeResults) {
-    logger.info('Merging Lighthouse and Axe-Core results');
+  mergeResults(lighthouseResults, axeResults, pa11yResults = null) {
+    const tools = pa11yResults
+      ? 'Lighthouse, Axe-Core, and Pa11y'
+      : 'Lighthouse and Axe-Core';
+    logger.info(`Merging ${tools} results`);
 
     const merged = {
-      url: lighthouseResults.url || axeResults.url,
+      url: lighthouseResults.url || axeResults.url || pa11yResults?.url,
       timestamp: new Date().toISOString(),
 
       // Combined scores
-      scores: this.calculateCombinedScores(lighthouseResults, axeResults),
+      scores: this.calculateCombinedScores(
+        lighthouseResults,
+        axeResults,
+        pa11yResults
+      ),
 
       // Accessibility results
       accessibility: this.mergeAccessibilityResults(
         lighthouseResults.accessibility,
-        axeResults
+        axeResults,
+        pa11yResults
       ),
 
       // Keep other Lighthouse categories
@@ -43,6 +62,12 @@ class ResultsMerger {
           version: axeResults.testEngine?.version,
           testRunner: axeResults.testRunner,
         },
+        ...(pa11yResults && {
+          pa11y: {
+            runner: 'htmlcs',
+            documentTitle: pa11yResults.documentTitle,
+          },
+        }),
       },
     };
 
@@ -50,6 +75,7 @@ class ResultsMerger {
       totalIssues: merged.accessibility.issues.length,
       lighthouseIssues: lighthouseResults.accessibility?.issues?.length || 0,
       axeViolations: axeResults.violations?.length || 0,
+      pa11yIssues: pa11yResults?.issues?.length || 0,
     });
 
     return merged;
@@ -59,21 +85,34 @@ class ResultsMerger {
    * Calculate combined scores
    * @private
    */
-  calculateCombinedScores(lighthouseResults, axeResults) {
+  calculateCombinedScores(lighthouseResults, axeResults, pa11yResults = null) {
     const lighthouseScore = lighthouseResults.accessibility?.score || 0;
-
-    // Calculate Axe score (0-100)
     const axeScore = this.calculateAxeScore(axeResults);
+    const pa11yScore = pa11yResults?.score?.score || null;
 
-    // Combined score (weighted average: 50% Lighthouse, 50% Axe)
-    const combinedScore = Math.round(lighthouseScore * 0.5 + axeScore * 0.5);
+    let combinedScore;
+    if (pa11yScore !== null) {
+      // Three-way average: 40% Lighthouse, 40% Axe, 20% Pa11y
+      combinedScore = Math.round(
+        lighthouseScore * 0.4 + axeScore * 0.4 + pa11yScore * 0.2
+      );
+    } else {
+      // Two-way average: 50% Lighthouse, 50% Axe
+      combinedScore = Math.round(lighthouseScore * 0.5 + axeScore * 0.5);
+    }
 
-    return {
+    const scores = {
       lighthouse: Math.round(lighthouseScore),
       axe: Math.round(axeScore),
       combined: combinedScore,
-      grade: this.getGrade(combinedScore),
+      grade: getGrade(combinedScore),
     };
+
+    if (pa11yScore !== null) {
+      scores.pa11y = Math.round(pa11yScore);
+    }
+
+    return scores;
   }
 
   /**
@@ -82,75 +121,66 @@ class ResultsMerger {
    */
   calculateAxeScore(axeResults) {
     const { violations = [], incomplete = [], passes = [] } = axeResults;
-
-    // Weight by impact
-    const impactWeights = {
-      critical: 10,
-      serious: 7,
-      moderate: 4,
-      minor: 1,
-    };
-
-    let totalWeight = 0;
-    let violationWeight = 0;
-
-    // Count violations
-    violations.forEach((violation) => {
-      const weight = impactWeights[violation.impact] || 1;
-      const nodeCount = violation.nodes?.length || 1;
-      violationWeight += weight * nodeCount;
-      totalWeight += weight * nodeCount;
-    });
-
-    // Count incomplete (half weight)
-    incomplete.forEach((item) => {
-      const weight = (impactWeights[item.impact] || 1) * 0.5;
-      const nodeCount = item.nodes?.length || 1;
-      totalWeight += weight * nodeCount;
-    });
-
-    // Count passes
-    totalWeight += passes.length;
-
-    // Calculate score
-    return totalWeight > 0
-      ? ((totalWeight - violationWeight) / totalWeight) * 100
-      : 100;
-  }
-
-  /**
-   * Get letter grade from score
-   * @private
-   */
-  getGrade(score) {
-    if (score >= 90) return 'A';
-    if (score >= 80) return 'B';
-    if (score >= 70) return 'C';
-    if (score >= 60) return 'D';
-    return 'F';
+    return calculateWeightedScore(violations, incomplete, passes);
   }
 
   /**
    * Merge accessibility results
    * @private
    */
-  mergeAccessibilityResults(lighthouseAccessibility, axeResults) {
+  mergeAccessibilityResults(
+    lighthouseAccessibility,
+    axeResults,
+    pa11yResults = null
+  ) {
     const lighthouseIssues = lighthouseAccessibility?.issues || [];
     const axeViolations = axeResults.violations || [];
     const axeIncomplete = axeResults.incomplete || [];
+    const pa11yIssues = pa11yResults?.issues || [];
 
     // Convert Axe violations to common format
-    const axeIssues = this.convertAxeViolationsToIssues(axeViolations);
-    const incompleteIssues = this.convertAxeIncompleteToIssues(axeIncomplete);
+    const axeIssues = axeViolations.map(convertAxeViolationToIssue);
+    const incompleteIssues = axeIncomplete.map(convertAxeIncompleteToIssue);
+
+    // Convert Pa11y issues to common format
+    const pa11yFormattedIssues = pa11yIssues.map(convertPa11yIssueToCommon);
 
     // Deduplicate issues
-    const allIssues = [...lighthouseIssues, ...axeIssues, ...incompleteIssues];
-    const uniqueIssues = this.deduplicateIssues(allIssues);
+    const allIssues = [
+      ...lighthouseIssues,
+      ...axeIssues,
+      ...incompleteIssues,
+      ...pa11yFormattedIssues,
+    ];
+    const uniqueIssues = deduplicateIssues(allIssues);
+
+    const bySource = {
+      lighthouse: uniqueIssues.filter((i) =>
+        i.detectedBy?.includes('lighthouse')
+      ).length,
+      axe: uniqueIssues.filter((i) => i.detectedBy?.includes('axe-core'))
+        .length,
+      both: uniqueIssues.filter(
+        (i) =>
+          i.detectedBy?.includes('lighthouse') &&
+          i.detectedBy?.includes('axe-core')
+      ).length,
+    };
+
+    if (pa11yResults) {
+      bySource.pa11y = uniqueIssues.filter((i) =>
+        i.detectedBy?.includes('pa11y')
+      ).length;
+      bySource.multiple = uniqueIssues.filter(
+        (i) => i.detectedBy && i.detectedBy.length > 1
+      ).length;
+    }
 
     return {
       score: this.calculateCombinedScores(
         { accessibility: lighthouseAccessibility },
-        axeResults
+        axeResults,
+        pa11yResults
       ).combined,
       issues: uniqueIssues,
       summary: {
@@ -159,226 +189,10 @@ class ResultsMerger {
         serious: uniqueIssues.filter((i) => i.severity === 'serious').length,
         moderate: uniqueIssues.filter((i) => i.severity === 'moderate').length,
         minor: uniqueIssues.filter((i) => i.severity === 'minor').length,
-        bySource: {
-          lighthouse: uniqueIssues.filter((i) =>
-            i.detectedBy?.includes('lighthouse')
-          ).length,
-          axe: uniqueIssues.filter((i) => i.detectedBy?.includes('axe-core'))
-            .length,
-          both: uniqueIssues.filter(
-            (i) =>
-              i.detectedBy?.includes('lighthouse') &&
-              i.detectedBy?.includes('axe-core')
-          ).length,
-        },
+        bySource,
       },
-      wcagCompliance: this.calculateWCAGCompliance(uniqueIssues),
+      wcagCompliance: calculateWCAGCompliance(uniqueIssues),
     };
-  }
-
-  /**
-   * Convert Axe violations to common issue format
-   * @private
-   */
-  convertAxeViolationsToIssues(violations) {
-    // Keep violations grouped by rule ID instead of creating separate issues per node
-    return violations.map((violation) => ({
-      type: 'accessibility',
-      title: violation.help,
-      description: violation.description,
-      severity: violation.impact, // critical, serious, moderate, minor
-      impact: this.mapImpactToScore(violation.impact),
-      detectedBy: ['axe-core'],
-      wcagCriteria: this.extractWCAGCriteria(violation.tags),
-      wcagLevel: this.extractWCAGLevel(violation.tags),
-      helpUrl: violation.helpUrl,
-      // Include all affected nodes
-      nodes: violation.nodes.map((node) => ({
-        selector: node.target?.[0] || null,
-        html: node.html,
-        failureSummary: node.failureSummary,
-      })),
-      nodeCount: violation.nodes.length,
-      // Keep first node's selector for backward compatibility
-      selector: violation.nodes[0]?.target?.[0] || null,
-      html: violation.nodes[0]?.html,
-      failureSummary: violation.nodes[0]?.failureSummary,
-      recommendations: [
-        {
-          description: violation.help,
-          implementation: violation.nodes[0]?.failureSummary,
-          learnMore: violation.helpUrl,
-        },
-      ],
-    }));
-  }
-
-  /**
-   * Convert Axe incomplete to common issue format
-   * @private
-   */
-  convertAxeIncompleteToIssues(incomplete) {
-    // Keep incomplete items grouped by rule ID instead of creating separate issues per node
-    return incomplete.map((item) => ({
-      type: 'accessibility',
-      title: `${item.help} (Needs Manual Review)`,
-      description: item.description,
-      severity: 'moderate',
-      impact: 50,
-      detectedBy: ['axe-core'],
-      requiresManualCheck: true,
-      wcagCriteria: this.extractWCAGCriteria(item.tags),
-      wcagLevel: this.extractWCAGLevel(item.tags),
-      helpUrl: item.helpUrl,
-      // Include all affected nodes
-      nodes: item.nodes.map((node) => ({
-        selector: node.target?.[0] || null,
-        html: node.html,
-        failureSummary: node.failureSummary,
-      })),
-      nodeCount: item.nodes.length,
-      // Keep first node's selector for backward compatibility
-      selector: item.nodes[0]?.target?.[0] || null,
-      html: item.nodes[0]?.html,
-      recommendations: [
-        {
-          description: `Manual check required: ${item.help}`,
-          implementation: item.nodes[0]?.failureSummary,
-          learnMore: item.helpUrl,
-        },
-      ],
-    }));
-  }
-
-  /**
-   * Map Axe impact to numeric score
-   * @private
-   */
-  mapImpactToScore(impact) {
-    const impactMap = {
-      critical: 100,
-      serious: 75,
-      moderate: 50,
-      minor: 25,
-    };
-    return impactMap[impact] || 50;
-  }
-
-  /**
-   * Extract WCAG criteria from tags
-   * @private
-   */
-  extractWCAGCriteria(tags) {
-    const criteriaPattern = /wcag\d{3,4}/;
-    return tags
-      .filter((tag) => criteriaPattern.test(tag))
-      .map((tag) => {
-        const match = tag.match(/wcag(\d)(\d)(\d+)/);
-        if (match) {
-          return `${match[1]}.${match[2]}.${match[3]}`;
-        }
-        return tag;
-      });
-  }
-
-  /**
-   * Extract WCAG level from tags
-   * @private
-   */
-  extractWCAGLevel(tags) {
-    if (
-      tags.some((tag) => tag.includes('wcag2aaa') || tag.includes('wcag21aaa'))
-    ) {
-      return 'AAA';
-    }
-    if (
-      tags.some((tag) => tag.includes('wcag2aa') || tag.includes('wcag21aa'))
-    ) {
-      return 'AA';
-    }
-    if (tags.some((tag) => tag.includes('wcag2a') || tag.includes('wcag21a'))) {
-      return 'A';
-    }
-    return 'Unknown';
-  }
-
-  /**
-   * Deduplicate issues from multiple sources
-   * @private
-   */
-  deduplicateIssues(issues) {
-    const issueMap = new Map();
-
-    issues.forEach((issue) => {
-      // Create unique key based on title and selector
-      const key = `${issue.title}-${issue.selector || 'no-selector'}`;
-
-      if (issueMap.has(key)) {
-        // Merge detectedBy arrays
-        const existing = issueMap.get(key);
-        existing.detectedBy = [
-          ...new Set([...existing.detectedBy, ...issue.detectedBy]),
-        ];
-
-        // Keep higher severity
-        if (
-          this.mapImpactToScore(issue.severity) >
-          this.mapImpactToScore(existing.severity)
-        ) {
-          existing.severity = issue.severity;
-          existing.impact = issue.impact;
-        }
-      } else {
-        issueMap.set(key, { ...issue });
-      }
-    });
-
-    return Array.from(issueMap.values());
-  }
-
-  /**
-   * Calculate WCAG compliance summary
-   * @private
-   */
-  calculateWCAGCompliance(issues) {
-    const levelA = issues.filter((i) => i.wcagLevel === 'A');
-    const levelAA = issues.filter((i) => i.wcagLevel === 'AA');
-    const levelAAA = issues.filter((i) => i.wcagLevel === 'AAA');
-
-    return {
-      A: {
-        violations: levelA.length,
-        compliant: levelA.length === 0,
-      },
-      AA: {
-        violations: levelAA.length,
-        compliant: levelAA.length === 0,
-      },
-      AAA: {
-        violations: levelAAA.length,
-        compliant: levelAAA.length === 0,
-      },
-      overall: {
-        compliantLevel: this.determineCompliantLevel(levelA, levelAA, levelAAA),
-      },
-    };
-  }
-
-  /**
-   * Determine overall WCAG compliance level
-   * @private
-   */
-  determineCompliantLevel(levelA, levelAA, levelAAA) {
-    if (levelA.length === 0 && levelAA.length === 0 && levelAAA.length === 0) {
-      return 'AAA';
-    }
-    if (levelA.length === 0 && levelAA.length === 0) {
-      return 'AA';
-    }
-    if (levelA.length === 0) {
-      return 'A';
-    }
-    return 'Non-compliant';
   }
 }
 

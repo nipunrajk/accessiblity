@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import path from 'path';
 import { promises as fs } from 'fs';
-import os from 'os';
+
 import logger from '../utils/logger.js';
 
 const getGitConfig = async () => {

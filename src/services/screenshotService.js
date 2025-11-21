@@ -1,8 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { config } from '../config/index.js';
 
 class ScreenshotService {
   constructor() {
-    this.baseUrl = `${API_BASE_URL}/api/screenshot`;
+    this.baseUrl = `${config.api.baseUrl}/api/screenshot`;
   }
 
   /**

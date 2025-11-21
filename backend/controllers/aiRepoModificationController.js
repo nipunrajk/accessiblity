@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest';
-import backendAIProvider from '../services/aiProvider.js';
+import { aiProvider } from '../services/ai/index.js';
 import path from 'path';
 import { promises as fs } from 'fs';
 
@@ -52,7 +52,7 @@ Format your response as a JSON array with this structure:
         typeof context === 'object' ? JSON.stringify(context) : context || ''
       );
 
-    const response = await backendAIProvider.invoke(formattedPrompt);
+    const response = await aiProvider.invoke(formattedPrompt);
 
     try {
       return JSON.parse(response);
@@ -80,7 +80,7 @@ const generatePRDescription = async (changes, results) => {
         2. Impact analysis
         3. Testing recommendations`;
 
-  const response = await backendAIProvider.invoke(prompt);
+  const response = await aiProvider.invoke(prompt);
   return response;
 };
 

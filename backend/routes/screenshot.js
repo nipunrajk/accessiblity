@@ -1,6 +1,7 @@
 import express from 'express';
 import screenshotService from '../services/screenshotService.js';
 import logger from '../utils/logger.js';
+import { validateUrl } from '../utils/validation.js';
 
 const router = express.Router();
 
@@ -17,16 +18,12 @@ router.post('/capture', async (req, res) => {
     }
 
     // Validate URL
-    try {
-      new URL(url);
-    } catch (urlError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid URL provided',
-      });
-    }
+    const validatedUrl = validateUrl(url);
 
-    const result = await screenshotService.captureScreenshot(url, options);
+    const result = await screenshotService.captureScreenshot(
+      validatedUrl,
+      options
+    );
     res.json(result);
   } catch (error) {
     logger.error('Screenshot API error', error, { url: req.body.url });
@@ -49,17 +46,10 @@ router.post('/highlight', async (req, res) => {
       });
     }
 
-    try {
-      new URL(url);
-    } catch (urlError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid URL provided',
-      });
-    }
+    const validatedUrl = validateUrl(url);
 
     const result = await screenshotService.captureWithHighlights(
-      url,
+      validatedUrl,
       issues,
       options
     );
@@ -87,17 +77,10 @@ router.post('/comparison', async (req, res) => {
       });
     }
 
-    try {
-      new URL(url);
-    } catch (urlError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid URL provided',
-      });
-    }
+    const validatedUrl = validateUrl(url);
 
     const result = await screenshotService.generateBeforeAfterComparison(
-      url,
+      validatedUrl,
       fixes,
       options
     );
@@ -132,17 +115,10 @@ router.post('/issue-wise', async (req, res) => {
       });
     }
 
-    try {
-      new URL(url);
-    } catch (urlError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid URL provided',
-      });
-    }
+    const validatedUrl = validateUrl(url);
 
     const result = await screenshotService.captureIssueWiseScreenshots(
-      url,
+      validatedUrl,
       issues,
       options
     );

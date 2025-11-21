@@ -1,5 +1,3 @@
-import MetricItem from './MetricItem';
-
 function AccessibilityMetrics({ data }) {
   if (!data.issues) return null;
 

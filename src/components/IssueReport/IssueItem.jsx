@@ -16,6 +16,8 @@ function IssueItem({ issue, websiteUrl }) {
         return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300';
       case 'seo':
         return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300';
+      case 'keyboard':
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300';
       default:
         return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300';
     }
@@ -25,7 +27,7 @@ function IssueItem({ issue, websiteUrl }) {
     <div className='border border-gray-200 dark:border-dark-border rounded-xl p-6 hover:border-gray-300 dark:hover:border-gray-600 transition-colors'>
       <div className='flex items-start justify-between mb-4'>
         <div className='flex-1'>
-          <div className='flex items-center gap-3 mb-2'>
+          <div className='flex items-center gap-3 mb-2 flex-wrap'>
             <span
               className={`text-xs px-2 py-1 rounded-full font-medium ${getTypeColorClass(
                 issue.type
@@ -33,6 +35,19 @@ function IssueItem({ issue, websiteUrl }) {
             >
               {issue.type.charAt(0).toUpperCase() + issue.type.slice(1)}
             </span>
+            {issue.detectedBy && issue.detectedBy.length > 0 && (
+              <div className='flex items-center gap-1'>
+                {issue.detectedBy.map((tool) => (
+                  <span
+                    key={tool}
+                    className='text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    title={`Detected by ${tool}`}
+                  >
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <h3 className='text-lg font-semibold text-gray-900 dark:text-dark-text-primary mb-2'>
             {issue.title}

@@ -3,7 +3,7 @@
  * Run with: node backend/analyze-nipun-site.js
  */
 
-import axeService from './services/accessibility/axeService.js';
+import axeService from './services/analysis/axe.service.js';
 import axeResultsParser from './services/accessibility/axeResultsParser.js';
 import logger from './utils/logger.js';
 
