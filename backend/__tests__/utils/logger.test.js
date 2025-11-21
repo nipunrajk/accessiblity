@@ -5,7 +5,7 @@
  * Tests focus on core functionality without mocking.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import logger from '../../utils/logger.js';
 
 describe('Logger Utility', () => {
@@ -15,9 +15,9 @@ describe('Logger Utility', () => {
 
   beforeEach(() => {
     // Capture console output
-    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
