@@ -7,7 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "install-deps": "npm install"
+    "install-deps": "npm install",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.64.0",
@@ -30,7 +34,11 @@
     "puppeteer": "^24.1.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@vitest/coverage-v8": "^4.0.13",
+    "@vitest/ui": "^4.0.13",
+    "nodemon": "^3.0.1",
+    "supertest": "^7.1.4",
+    "vitest": "^4.0.13"
   },
   "engines": {
     "node": ">=16.0.0"

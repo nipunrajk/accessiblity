@@ -5,7 +5,7 @@
  * Uses supertest to make actual HTTP requests to the server.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 
