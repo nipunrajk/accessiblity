@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Check if commit message follows conventional commits format
+commit_msg=$(cat "$1")
+pattern="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .{1,}"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo "❌ Invalid commit message format!"
+  echo "✅ Use: feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert: message"
+  echo "Examples:"
+  echo "  feat: add new feature"
+  echo "  fix: resolve bug in component"
+  echo "  docs: update README"
+  exit 1
+fi

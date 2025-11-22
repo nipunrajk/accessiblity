@@ -8,10 +8,19 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "install-deps": "npm install",
+    "lint:fix": "eslint . --fix",
+    "precommit": "lint-staged",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
+  },
+  "lint-staged": {
+    "**/*.js": [
+      "eslint --fix",
+      "prettier --write",
+      "vitest related --run"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.64.0",
@@ -36,7 +45,10 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.13",
     "@vitest/ui": "^4.0.13",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "nodemon": "^3.0.1",
+    "prettier": "^3.6.2",
     "supertest": "^7.1.4",
     "vitest": "^4.0.13"
   },

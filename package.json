@@ -7,10 +7,19 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "unlighthouse": "npx @unlighthouse/cli --site localhost:5173",
     "ai:setup": "node scripts/ai-setup.js",
-    "ai:status": "node scripts/ai-setup.js"
+    "ai:status": "node scripts/ai-setup.js",
+    "prepare": "husky",
+    "precommit": "lint-staged"
+  },
+  "lint-staged": {
+    "src/**/*.{js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.64.0",
@@ -44,7 +53,10 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "postcss": "^8.5.1",
+    "prettier": "^3.6.2",
     "tailwindcss": "^3.4.17",
     "vite": "^6.0.5"
   }
