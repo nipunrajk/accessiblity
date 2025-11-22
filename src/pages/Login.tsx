@@ -187,41 +187,42 @@ function Login() {
   ];
 
   return (
-    <div className='flex min-h-screen bg-white'>
+    <div className='flex min-h-screen bg-background'>
       {/* Left Panel - Features */}
-      <div className='hidden lg:flex lg:w-1/2 bg-linear-to-br from-blue-50 via-purple-50/30 to-white p-12 flex-col justify-between'>
+      <div className='hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/10 via-accent/5 to-background p-12 flex-col justify-between'>
         <div>
           {/* Logo */}
-          <div className='mb-16'>
-            <img src='/logo.svg' alt='FastFix Logo' className='h-12' />
+          <div className='flex items-center gap-2 mb-12'>
+            <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-primary'>
+              <ZapIcon />
+            </div>
+            <span className='text-xl font-bold text-foreground'>FastFix</span>
           </div>
 
           {/* Main Content */}
-          <div className='space-y-12 max-w-lg'>
+          <div className='space-y-8 max-w-md'>
             <div>
-              <h1 className='text-4xl font-bold text-gray-900 leading-tight mb-4'>
-                AI-Powered
-                <br />
-                Website Optimization
+              <h1 className='text-4xl font-bold text-foreground text-balance mb-4'>
+                AI-Powered Website Optimization
               </h1>
-              <p className='text-base text-gray-500 leading-relaxed'>
+              <p className='text-lg text-muted-foreground text-balance'>
                 Diagnose, optimize, and fix your website's accessibility,
                 performance, and search rankings automatically.
               </p>
             </div>
 
             {/* Features List */}
-            <div className='space-y-6'>
+            <div className='space-y-4'>
               {features.map((feature) => (
-                <div key={feature.title} className='flex gap-4 items-start'>
-                  <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600'>
+                <div key={feature.title} className='flex gap-3 items-start'>
+                  <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10'>
                     <feature.icon />
                   </div>
                   <div>
-                    <h3 className='font-semibold text-gray-900 text-base mb-1.5'>
+                    <h3 className='font-semibold text-foreground mb-1'>
                       {feature.title}
                     </h3>
-                    <p className='text-sm text-gray-500 leading-relaxed'>
+                    <p className='text-sm text-muted-foreground'>
                       {feature.description}
                     </p>
                   </div>
@@ -232,15 +233,13 @@ function Login() {
         </div>
 
         {/* Footer Badges */}
-        <div className='flex items-center gap-8 text-sm text-gray-500'>
+        <div className='flex items-center gap-6 text-sm text-muted-foreground'>
           <div className='flex items-center gap-2'>
             <ShieldIcon />
             <span>SOC 2 Certified</span>
           </div>
           <div className='flex items-center gap-2'>
-            <div className='h-4 w-4'>
-              <CheckCircleIcon />
-            </div>
+            <CheckCircleIcon />
             <span>99.9% Uptime</span>
           </div>
         </div>
@@ -251,15 +250,18 @@ function Login() {
         <div className='w-full max-w-md'>
           {/* Mobile Logo */}
           <div className='lg:hidden mb-8 text-center'>
-            <img src='/logo.svg' alt='FastFix Logo' className='h-12 mx-auto' />
+            <div className='mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary'>
+              <ZapIcon />
+            </div>
+            <span className='text-xl font-bold text-foreground'>FastFix</span>
           </div>
 
           {/* Header */}
           <div className='mb-8'>
-            <h2 className='text-3xl font-bold text-gray-900 mb-3'>
+            <h2 className='text-3xl font-bold text-foreground mb-2'>
               Welcome back
             </h2>
-            <p className='text-base text-gray-500'>
+            <p className='text-muted-foreground'>
               Enter your credentials to access your dashboard
             </p>
           </div>
@@ -272,14 +274,9 @@ function Login() {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className='space-y-5'>
+          <form onSubmit={handleSubmit} className='space-y-4'>
             <div className='space-y-2'>
-              <Label
-                htmlFor='email'
-                className='text-sm font-medium text-gray-900'
-              >
-                Email address
-              </Label>
+              <Label htmlFor='email'>Email address</Label>
               <Input
                 id='email'
                 type='email'
@@ -289,21 +286,16 @@ function Login() {
                 onChange={handleChange}
                 required
                 disabled={isLoading}
-                className='h-11 text-base'
+                className='h-11'
               />
             </div>
 
             <div className='space-y-2'>
               <div className='flex items-center justify-between'>
-                <Label
-                  htmlFor='password'
-                  className='text-sm font-medium text-gray-900'
-                >
-                  Password
-                </Label>
+                <Label htmlFor='password'>Password</Label>
                 <a
                   href='/forgot-password'
-                  className='text-sm text-blue-600 hover:underline font-medium'
+                  className='text-sm text-primary hover:underline'
                   tabIndex={-1}
                 >
                   Forgot password?
@@ -317,26 +309,22 @@ function Login() {
                 onChange={handleChange}
                 required
                 disabled={isLoading}
-                className='h-11 text-base'
+                className='h-11'
               />
             </div>
 
-            <button
-              type='submit'
-              disabled={isLoading}
-              className='w-full h-12 bg-blue-600 text-white text-base rounded-lg font-medium hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-6'
-            >
+            <Button type='submit' disabled={isLoading} className='w-full h-11'>
               {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
+            </Button>
           </form>
 
           {/* Divider */}
-          <div className='relative my-8'>
+          <div className='relative my-6'>
             <div className='absolute inset-0 flex items-center'>
-              <div className='w-full border-t border-gray-200' />
+              <div className='w-full border-t' />
             </div>
             <div className='relative flex justify-center text-xs uppercase'>
-              <span className='bg-white px-3 text-gray-400 font-medium'>
+              <span className='bg-background px-2 text-muted-foreground'>
                 Or continue with
               </span>
             </div>
@@ -344,41 +332,49 @@ function Login() {
 
           {/* Social Login Buttons */}
           <div className='grid grid-cols-2 gap-3'>
-            <button
+            <Button
               type='button'
+              variant='outline'
               disabled={isLoading}
-              className='h-11 flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-900 text-base rounded-lg font-medium hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+              className='h-11 bg-transparent'
             >
               <GithubIcon />
-              <span>GitHub</span>
-            </button>
-            <button
+              GitHub
+            </Button>
+            <Button
               type='button'
+              variant='outline'
               disabled={isLoading}
-              className='h-11 flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-900 text-base rounded-lg font-medium hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+              className='h-11 bg-transparent'
             >
               <GoogleIcon />
-              <span>Google</span>
-            </button>
+              Google
+            </Button>
           </div>
 
           {/* Sign Up Link */}
-          <div className='mt-6 text-center text-sm text-gray-500'>
+          <div className='mt-6 text-center text-sm text-muted-foreground'>
             Don't have an account?{' '}
-            <a href='/' className='text-blue-600 font-medium hover:underline'>
+            <a href='/' className='text-primary font-medium hover:underline'>
               Create account
             </a>
           </div>
 
           {/* Trusted By Section */}
-          <div className='mt-12 pt-8 border-t border-gray-200'>
-            <p className='text-xs text-gray-400 text-center mb-4'>
+          <div className='mt-8 pt-6 border-t'>
+            <p className='text-xs text-muted-foreground text-center mb-3'>
               Trusted by over 10,000+ developers
             </p>
-            <div className='flex justify-center items-center gap-6'>
-              <span className='text-xs text-gray-400 font-medium'>Vercel</span>
-              <span className='text-xs text-gray-400 font-medium'>GitHub</span>
-              <span className='text-xs text-gray-400 font-medium'>Linear</span>
+            <div className='flex justify-center items-center gap-6 opacity-50'>
+              <Badge variant='outline' className='font-normal'>
+                Vercel
+              </Badge>
+              <Badge variant='outline' className='font-normal'>
+                GitHub
+              </Badge>
+              <Badge variant='outline' className='font-normal'>
+                Linear
+              </Badge>
             </div>
           </div>
         </div>
