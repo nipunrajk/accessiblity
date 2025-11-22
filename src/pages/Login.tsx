@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { STORAGE_KEYS } from '../constants';
 import '../styles/SignUp.css';
 
@@ -8,38 +9,50 @@ function Login() {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [localError, setLocalError] = useState('');
 
-  const handleChange = (e) => {
+  const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const authError = useAuthStore((state) => state.error);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
       ...prevState,
       [name]: value,
     }));
+    setLocalError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
+    setLocalError('');
 
     // Basic validation
     if (!formData.email || !formData.password) {
-      setError('All fields are required');
+      setLocalError('All fields are required');
       return;
     }
 
-    // Clear any previous analysis data when user logs in
-    Object.values(STORAGE_KEYS).forEach((key) => {
-      localStorage.removeItem(key);
-    });
+    try {
+      await login(formData);
 
-    // Set a flag to indicate fresh login
-    sessionStorage.setItem('freshLogin', 'true');
+      // Clear any previous analysis data when user logs in
+      Object.values(STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key);
+      });
 
-    // Here you would typically make an API call to authenticate the user
-    navigate('/analyzer');
+      // Set a flag to indicate fresh login
+      sessionStorage.setItem('freshLogin', 'true');
+
+      navigate('/analyzer');
+    } catch (error) {
+      setLocalError(authError || 'Login failed. Please try again.');
+    }
   };
+
+  const displayError = localError || authError;
 
   return (
     <div className='signup-container'>
@@ -50,7 +63,7 @@ function Login() {
           Don't have an account? <a href='/'>Sign up</a>
         </p>
 
-        {error && <div className='error-message'>{error}</div>}
+        {displayError && <div className='error-message'>{displayError}</div>}
 
         <form onSubmit={handleSubmit} className='signup-form'>
           <div className='form-group'>
@@ -61,6 +74,7 @@ function Login() {
               name='email'
               value={formData.email}
               onChange={handleChange}
+              disabled={isLoading}
             />
           </div>
 
@@ -73,12 +87,13 @@ function Login() {
                 name='password'
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
           </div>
 
-          <button type='submit' className='signup-button'>
-            Sign in
+          <button type='submit' className='signup-button' disabled={isLoading}>
+            {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
       </div>

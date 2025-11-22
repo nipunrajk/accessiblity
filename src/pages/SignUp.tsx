@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { STORAGE_KEYS } from '../constants';
 import '../styles/SignUp.css';
 
@@ -9,43 +10,55 @@ function SignUp() {
     email: '',
     password: '',
   });
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [localError, setLocalError] = useState('');
 
-  const handleChange = (e) => {
+  const navigate = useNavigate();
+  const register = useAuthStore((state) => state.register);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const authError = useAuthStore((state) => state.error);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
       ...prevState,
       [name]: value,
     }));
+    setLocalError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
+    setLocalError('');
 
     // Basic validation
     if (!formData.username || !formData.email || !formData.password) {
-      setError('All fields are required');
+      setLocalError('All fields are required');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setLocalError('Password must be at least 6 characters long');
       return;
     }
 
-    // Clear any previous analysis data when user logs in
-    Object.values(STORAGE_KEYS).forEach((key) => {
-      localStorage.removeItem(key);
-    });
+    try {
+      await register(formData);
 
-    // Set a flag to indicate fresh login
-    sessionStorage.setItem('freshLogin', 'true');
+      // Clear any previous analysis data when user logs in
+      Object.values(STORAGE_KEYS).forEach((key) => {
+        localStorage.removeItem(key);
+      });
 
-    // Here you would typically make an API call to register the user
-    navigate('/analyzer');
+      // Set a flag to indicate fresh login
+      sessionStorage.setItem('freshLogin', 'true');
+
+      navigate('/analyzer');
+    } catch (error) {
+      setLocalError(authError || 'Registration failed. Please try again.');
+    }
   };
+
+  const displayError = localError || authError;
 
   return (
     <div className='signup-container'>
@@ -56,7 +69,7 @@ function SignUp() {
           Already have an account? <a href='/login'>Sign in</a>
         </p>
 
-        {error && <div className='error-message'>{error}</div>}
+        {displayError && <div className='error-message'>{displayError}</div>}
 
         <form onSubmit={handleSubmit} className='signup-form'>
           <div className='form-group'>
@@ -67,6 +80,7 @@ function SignUp() {
               name='username'
               value={formData.username}
               onChange={handleChange}
+              disabled={isLoading}
             />
           </div>
 
@@ -78,6 +92,7 @@ function SignUp() {
               name='email'
               value={formData.email}
               onChange={handleChange}
+              disabled={isLoading}
             />
           </div>
 
@@ -90,12 +105,13 @@ function SignUp() {
                 name='password'
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isLoading}
               />
             </div>
           </div>
 
-          <button type='submit' className='signup-button'>
-            Create account
+          <button type='submit' className='signup-button' disabled={isLoading}>
+            {isLoading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
       </div>
