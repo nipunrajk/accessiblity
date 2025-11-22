@@ -66,7 +66,7 @@ class ErrorBoundary extends Component {
                   <summary className='cursor-pointer text-sm text-gray-500 hover:text-gray-700'>
                     Show Error Details
                   </summary>
-                  <div className='mt-2 p-3 bg-gray-100 rounded text-xs font-mono text-gray-800 overflow-auto max-h-32'>
+                  <div className='mt-2 p-3 bg-gray-100 rounded-sm text-xs font-mono text-gray-800 overflow-auto max-h-32'>
                     <div className='font-semibold mb-1'>Error:</div>
                     <div className='mb-2'>{this.state.error.toString()}</div>
                     <div className='font-semibold mb-1'>Stack Trace:</div>

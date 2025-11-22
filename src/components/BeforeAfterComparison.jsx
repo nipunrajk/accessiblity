@@ -96,7 +96,7 @@ function BeforeAfterComparison({
             onClick={() => setShowAfter(false)}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               !showAfter
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
@@ -106,7 +106,7 @@ function BeforeAfterComparison({
             onClick={() => setShowAfter(true)}
             className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
               showAfter
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-xs'
                 : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
             }`}
           >

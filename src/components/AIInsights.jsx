@@ -17,7 +17,7 @@ function AIInsights({ aiAnalysis, aiLoading }) {
   }
 
   return (
-    <div className='bg-gradient-to-br from-gray-50 to-white dark:from-dark-surface dark:to-dark-bg border border-gray-200 dark:border-dark-border rounded-2xl p-8'>
+    <div className='bg-linear-to-br from-gray-50 to-white dark:from-dark-surface dark:to-dark-bg border border-gray-200 dark:border-dark-border rounded-2xl p-8'>
       <div className='flex items-center gap-3 mb-6'>
         <div className='w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center'>
           <svg

@@ -40,7 +40,7 @@ function IssueItem({ issue, websiteUrl }) {
                 {issue.detectedBy.map((tool) => (
                   <span
                     key={tool}
-                    className='text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    className='text-xs px-2 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                     title={`Detected by ${tool}`}
                   >
                     {tool}

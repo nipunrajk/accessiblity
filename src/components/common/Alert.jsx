@@ -65,12 +65,12 @@ function Alert({
       className={`border rounded-lg p-4 flex items-start gap-3 ${variantClasses[variant]} ${className}`}
       role='alert'
     >
-      {icon && <div className='flex-shrink-0'>{icons[variant]}</div>}
+      {icon && <div className='shrink-0'>{icons[variant]}</div>}
       <div className='flex-1'>{children}</div>
       {onClose && (
         <button
           onClick={onClose}
-          className='flex-shrink-0 hover:opacity-70 transition-opacity'
+          className='shrink-0 hover:opacity-70 transition-opacity'
           aria-label='Close alert'
         >
           <svg className='w-5 h-5' fill='currentColor' viewBox='0 0 20 20'>

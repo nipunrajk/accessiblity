@@ -14,7 +14,7 @@ function ScreenshotFeatureShowcase({ websiteUrl }) {
   };
 
   return (
-    <div className='bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-8'>
+    <div className='bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-8'>
       <div className='text-center mb-6'>
         <h3 className='text-2xl font-bold text-gray-900 dark:text-white mb-2'>
           🎯 Visual Issue Detection

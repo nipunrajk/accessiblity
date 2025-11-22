@@ -166,7 +166,7 @@ function AxeViolations({ violations, incomplete, passes, showPasses = false }) {
                       {item.wcagCriteria.map((criteria) => (
                         <span
                           key={criteria}
-                          className='px-2 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs'
+                          className='px-2 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-sm text-xs'
                         >
                           {criteria}
                         </span>
@@ -185,7 +185,7 @@ function AxeViolations({ violations, incomplete, passes, showPasses = false }) {
                       {item.allNodes.slice(0, 5).map((node, idx) => (
                         <div
                           key={idx}
-                          className='bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-3'
+                          className='bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-sm p-3'
                         >
                           {node.target && (
                             <div className='mb-2'>
@@ -195,7 +195,7 @@ function AxeViolations({ violations, incomplete, passes, showPasses = false }) {
                             </div>
                           )}
                           {node.html && (
-                            <pre className='text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto'>
+                            <pre className='text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded-sm overflow-x-auto'>
                               <code>{node.html}</code>
                             </pre>
                           )}
