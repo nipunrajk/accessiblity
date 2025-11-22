@@ -26,7 +26,7 @@ function AnalysisForm({ onSubmit, loading }) {
             onChange={(e) => setWebsiteUrl(e.target.value)}
             placeholder='Enter website URL'
             required
-            className='flex-1 px-6 py-4 text-lg border border-gray-200 dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text-primary placeholder-gray-500 dark:placeholder-dark-text-muted'
+            className='flex-1 px-6 py-4 text-lg border border-gray-200 dark:border-dark-border rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-dark-surface text-gray-900 dark:text-dark-text-primary placeholder-gray-500 dark:placeholder-dark-text-muted'
           />
           <button
             type='submit'

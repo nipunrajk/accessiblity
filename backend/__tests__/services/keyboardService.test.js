@@ -426,7 +426,7 @@ describe('KeyboardService', () => {
       const result = await KeyboardService.testFocusIndicators(mockPage);
 
       expect(result.issues[0]).toHaveProperty('currentStyle');
-      expect(result.issues[0].currentStyle).toHaveProperty('outline');
+      expect(result.issues[0].currentStyle).toHaveProperty('outline-solid');
       expect(result.issues[0].currentStyle).toHaveProperty('boxShadow');
     });
   });

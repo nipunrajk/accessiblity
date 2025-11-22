@@ -409,7 +409,7 @@ class KeyboardService {
             element: element.tagName.toLowerCase(),
             selector,
             message: `Element has no visible focus indicator`,
-            recommendation: `Add :focus styles with visible outline or border`,
+            recommendation: `Add :focus styles with visible outline-solid or border`,
             currentStyle: {
               outline: style.outline,
               boxShadow: style.boxShadow,

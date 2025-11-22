@@ -15,7 +15,7 @@ function Button({
   fullWidth = false,
 }) {
   const baseClasses =
-    'font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+    'font-medium rounded-lg transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2';
 
   const variantClasses = {
     primary:
@@ -58,7 +58,7 @@ Button.propTypes = {
   variant: PropTypes.oneOf([
     'primary',
     'secondary',
-    'outline',
+    'outline-solid',
     'danger',
     'success',
   ]),

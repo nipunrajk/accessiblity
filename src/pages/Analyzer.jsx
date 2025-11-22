@@ -64,7 +64,7 @@ function Analyzer() {
                 <AIInsights aiAnalysis={aiAnalysis} aiLoading={aiLoading} />
               )
             ) : (
-              <div className='bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-8'>
+              <div className='bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-8'>
                 <div className='flex items-center gap-4 mb-4'>
                   <div className='w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex items-center justify-center'>
                     <svg
@@ -87,7 +87,7 @@ function Analyzer() {
                     </h3>
                     <p className='text-gray-600 dark:text-dark-text-secondary text-sm'>
                       Configure AI in{' '}
-                      <code className='bg-gray-200 dark:bg-gray-800 px-1 rounded'>
+                      <code className='bg-gray-200 dark:bg-gray-800 px-1 rounded-sm'>
                         src/config/aiConfig.js
                       </code>{' '}
                       to unlock advanced analysis
@@ -112,7 +112,7 @@ function Analyzer() {
 
             {/* Screenshot Feature */}
             {websiteUrl && (
-              <div className='bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-6'>
+              <div className='bg-linear-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-6'>
                 <div className='flex items-center gap-3 mb-4'>
                   <div className='w-10 h-10 bg-purple-100 dark:bg-purple-900/50 rounded-lg flex items-center justify-center'>
                     <svg

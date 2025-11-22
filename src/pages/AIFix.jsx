@@ -366,7 +366,7 @@ function AIFix() {
               <button
                 onClick={handleRegenerateFixes}
                 disabled={loadingStates.suggestions}
-                className='bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2'
+                className='bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2'
               >
                 {loadingStates.suggestions ? (
                   <>
@@ -394,7 +394,7 @@ function AIFix() {
             )}
             <button
               onClick={generatePDF}
-              className='bg-black text-white px-4 py-2 rounded hover:bg-gray-800 flex items-center gap-2'
+              className='bg-black text-white px-4 py-2 rounded-sm hover:bg-gray-800 flex items-center gap-2'
             >
               <svg
                 xmlns='http://www.w3.org/2000/svg'
@@ -434,7 +434,7 @@ function AIFix() {
                         token: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded'
+                    className='w-full p-2 border rounded-sm'
                     placeholder='Enter GitHub token'
                   />
                 </div>
@@ -451,7 +451,7 @@ function AIFix() {
                         owner: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded'
+                    className='w-full p-2 border rounded-sm'
                     placeholder='Enter repository owner'
                   />
                 </div>
@@ -468,7 +468,7 @@ function AIFix() {
                         repo: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded'
+                    className='w-full p-2 border rounded-sm'
                     placeholder='Enter repository name'
                   />
                 </div>
@@ -481,7 +481,7 @@ function AIFix() {
                   </button>
                   <button
                     onClick={handleSubmitGithubDetails}
-                    className='px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2'
+                    className='px-4 py-2 bg-green-600 text-white rounded-sm hover:bg-green-700 flex items-center gap-2'
                     disabled={loadingStates.submitting}
                   >
                     {loadingStates.submitting ? (
@@ -500,13 +500,13 @@ function AIFix() {
         )}
 
         {error && (
-          <div className='mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded'>
+          <div className='mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-sm'>
             <p className='text-red-700'>{error}</p>
           </div>
         )}
 
         {successMessage && (
-          <div className='mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded'>
+          <div className='mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-sm'>
             <p className='text-green-700'>{successMessage}</p>
           </div>
         )}
@@ -524,7 +524,7 @@ function AIFix() {
           !cachedAiFixes &&
           !loadingStates.suggestions &&
           Object.keys(fixSuggestions).length === 0 && (
-            <div className='mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded'>
+            <div className='mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-sm'>
               <div className='flex items-center gap-3'>
                 <svg
                   className='w-5 h-5 text-yellow-600'
@@ -590,7 +590,7 @@ function AIFix() {
               <div className='space-y-2'>
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-none ${
+                  className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-hidden ${
                     selectedCategory === 'all'
                       ? 'bg-gray-800 text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -602,7 +602,7 @@ function AIFix() {
                   <button
                     key={type}
                     onClick={() => setSelectedCategory(type)}
-                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-none ${
+                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-hidden ${
                       selectedCategory === type
                         ? 'bg-gray-800 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -688,7 +688,7 @@ function AIFix() {
                       <h4 className='font-medium text-gray-800 mb-2'>
                         Suggested Fix:
                       </h4>
-                      <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded'>
+                      <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm'>
                         {
                           '<meta name="description" content="Add your website description here">'
                         }
@@ -744,7 +744,7 @@ function AIFix() {
                             key={index}
                             className='border-t border-gray-100 pt-4'
                           >
-                            <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded'>
+                            <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm'>
                               {`<img ${element.attributes
                                 .map((attr) => `${attr.name}="${attr.value}"`)
                                 .join(' ')}>`}
@@ -760,7 +760,7 @@ function AIFix() {
 
                 {/* All Issues with AI Fixes */}
                 {hasAIAvailable && Object.keys(fixSuggestions).length > 0 && (
-                  <div className='bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'>
+                  <div className='bg-white rounded-lg shadow-xs border border-gray-200 p-6 mb-6'>
                     <h2 className='text-xl font-semibold text-gray-800 mb-4'>
                       🤖 AI-Generated Fixes
                     </h2>
@@ -932,7 +932,7 @@ function AIFix() {
                                         <span className='block text-sm text-gray-600 mb-2 font-medium'>
                                           Code Example:
                                         </span>
-                                        <pre className='text-black text-sm bg-gray-100 p-3 rounded overflow-x-auto'>
+                                        <pre className='text-black text-sm bg-gray-100 p-3 rounded-sm overflow-x-auto'>
                                           <code>
                                             {suggestion.code ||
                                               suggestion.codeExample}
@@ -943,7 +943,7 @@ function AIFix() {
 
                                     {(suggestion.impact ||
                                       suggestion.expectedImpact) && (
-                                      <div className='text-sm text-green-700 bg-green-50 p-2 rounded mb-3'>
+                                      <div className='text-sm text-green-700 bg-green-50 p-2 rounded-sm mb-3'>
                                         <strong>Expected Impact:</strong>{' '}
                                         {suggestion.impact ||
                                           suggestion.expectedImpact}
@@ -1183,7 +1183,7 @@ function AIFix() {
                                           onClick={() =>
                                             handleApplyFix(suggestions[0])
                                           }
-                                          className='bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm'
+                                          className='bg-green-600 text-white px-3 py-1 rounded-sm hover:bg-green-700 text-sm'
                                         >
                                           Apply Fix
                                         </button>
@@ -1205,7 +1205,7 @@ function AIFix() {
                                                 <span className='block text-sm text-gray-600 mb-1'>
                                                   Proposed Changes:
                                                 </span>
-                                                <pre className='text-black text-sm bg-gray-100 p-2 rounded overflow-x-auto'>
+                                                <pre className='text-black text-sm bg-gray-100 p-2 rounded-sm overflow-x-auto'>
                                                   <code>{suggestion.code}</code>
                                                 </pre>
                                               </div>
@@ -1313,7 +1313,7 @@ function AIFix() {
               ) : scannedElements.length > 0 ? (
                 <div className='space-y-4'>
                   {scannedElements.map((element, index) => (
-                    <div key={index} className='p-4 bg-white rounded-lg shadow'>
+                    <div key={index} className='p-4 bg-white rounded-lg shadow-sm'>
                       <div className='flex items-center space-x-2'>
                         <span className='font-mono text-blue-600'>
                           {element.tag}
