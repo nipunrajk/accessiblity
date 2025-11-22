@@ -3,13 +3,16 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-dark-bg: #0f172a;
-  --color-dark-surface: #1e293b;
-  --color-dark-border: #334155;
+  /* FastFix brand colors */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
 
-  --color-dark-text-primary: #f8fafc;
-  --color-dark-text-secondary: #cbd5e1;
-  --color-dark-text-muted: #64748b;
+  --color-purple-50: #faf5ff;
+
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 /*
