@@ -86,6 +86,35 @@ export default function Analyzer() {
     return "bg-destructive/10 border-destructive/20";
   };
 
+  const formatMs = (ms) => {
+    if (ms == null) return "N/A";
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+  };
+
+  const getMetricStatus = (score) => {
+    if (score == null) return "average";
+    if (score >= 90) return "good";
+    if (score >= 50) return "average";
+    return "poor";
+  };
+
+  // Mirror of backend extractWCAGLevel from transformers.js
+  const getWCAGLevelFromTags = (tags) => {
+    if (!tags?.length) return "Unknown";
+    if (tags.some((t) => t.includes("wcag2aaa") || t.includes("wcag21aaa")))
+      return "AAA";
+    if (tags.some((t) => t.includes("wcag2aa") || t.includes("wcag21aa")))
+      return "AA";
+    if (tags.some((t) => t === "wcag2a" || t === "wcag21a")) return "A";
+    return "Unknown";
+  };
+
+  const countPassesByLevel = (passes, level) => {
+    if (!passes?.length) return 0;
+    return passes.filter((p) => getWCAGLevelFromTags(p.tags) === level).length;
+  };
+
   // Show loading state
   if (loading) {
     return (
@@ -119,7 +148,6 @@ export default function Analyzer() {
             </div>
           </div>
         )}
-
         {!displayResults ? (
           <div className="mx-auto max-w-3xl">
             <div className="mb-8 text-center">
@@ -283,448 +311,612 @@ export default function Analyzer() {
               ))}
             </div>
 
-            {/* Screenshots Section */}
-            <div className="bg-card rounded-xl border p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Camera className="h-6 w-6 text-primary" />
-                    <h3 className="text-2xl font-bold">Page Screenshots</h3>
+            {/* Main Content Grid - 2/3 for data, 1/3 for visuals */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Left Column - Main Data */}
+              <div className="space-y-6 lg:col-span-2">
+                {/* AI Insights */}
+                {displayResults.aiInsights && (
+                  <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Sparkles className="h-6 w-6 text-accent" />
+                      <h3 className="text-2xl font-bold">AI Insights</h3>
+                    </div>
+                    <p className="text-base leading-relaxed text-foreground">
+                      {displayResults.aiInsights}
+                    </p>
                   </div>
-                  <p className="text-base text-muted-foreground">
-                    Visual analysis of your website
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSelectedDevice("desktop")}
-                    className={`px-5 py-2.5 text-base font-semibold rounded-lg flex items-center gap-2 ${
-                      selectedDevice === "desktop"
-                        ? "bg-primary text-primary-foreground"
-                        : "border hover:bg-accent"
-                    }`}
-                  >
-                    <Monitor className="h-5 w-5" />
-                    Desktop
-                  </button>
-                  <button
-                    onClick={() => setSelectedDevice("mobile")}
-                    className={`px-5 py-2.5 text-base font-semibold rounded-lg flex items-center gap-2 ${
-                      selectedDevice === "mobile"
-                        ? "bg-primary text-primary-foreground"
-                        : "border hover:bg-accent"
-                    }`}
-                  >
-                    <Smartphone className="h-5 w-5" />
-                    Mobile
-                  </button>
-                </div>
-              </div>
+                )}
 
-              <div className="space-y-6">
-                {/* Main Screenshot */}
-                <div className="relative group">
-                  <div className="aspect-16/10 rounded-lg border-2 bg-muted overflow-hidden">
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      <div className="text-center">
-                        <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Screenshot preview</p>
-                        <p className="text-xs">
-                          {selectedDevice === "desktop"
-                            ? "1920×1080"
-                            : "375×667"}
-                        </p>
+                {aiLoading && !displayResults.aiInsights && (
+                  <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
+                      <p className="text-sm text-muted-foreground">
+                        Generating AI insights...
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Issue Distribution & Performance Metrics */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="bg-card rounded-xl border p-6">
+                    <h3 className="text-2xl font-bold mb-3">
+                      Issue Distribution
+                    </h3>
+                    <p className="text-base text-muted-foreground mb-6">
+                      {Object.values(displayResults.issues).reduce(
+                        (a, b) => a + b,
+                        0,
+                      )}{" "}
+                      total issues detected
+                    </p>
+                    <div className="space-y-4">
+                      {Object.entries(displayResults.issues).map(
+                        ([key, value]) => {
+                          const total = Object.values(
+                            displayResults.issues,
+                          ).reduce((a, b) => a + b, 0);
+                          const percentage =
+                            total > 0 ? Math.round((value / total) * 100) : 0;
+                          return (
+                            <div key={key} className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium capitalize">
+                                  {key.replace(/([A-Z])/g, " $1").trim()}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground">
+                                    {percentage}%
+                                  </span>
+                                  <span
+                                    className={`px-2 py-0.5 text-xs rounded ${value > 20 ? "bg-destructive/10 text-destructive" : value > 10 ? "bg-secondary" : "border"}`}
+                                  >
+                                    {value}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-primary h-2 rounded-full"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        },
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-card rounded-xl border p-6">
+                    <h3 className="text-2xl font-bold mb-3">
+                      Performance Metrics
+                    </h3>
+                    <p className="text-base text-muted-foreground mb-6">
+                      Key timing measurements
+                    </p>
+                    <div className="space-y-4">
+                      {!results?.performance?.metrics
+                        ? Array.from({ length: 4 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="h-4 w-4 rounded-full bg-muted animate-pulse" />
+                                <div className="h-3 w-36 rounded bg-muted animate-pulse" />
+                              </div>
+                              <div className="h-3 w-12 rounded bg-muted animate-pulse" />
+                            </div>
+                          ))
+                        : [
+                            {
+                              label: "First Contentful Paint",
+                              value: formatMs(
+                                results.performance.metrics.fcp?.value,
+                              ),
+                              status: getMetricStatus(
+                                results.performance.metrics.fcp?.score,
+                              ),
+                            },
+                            {
+                              label: "Speed Index",
+                              value: formatMs(
+                                results.performance.metrics.si?.value,
+                              ),
+                              status: getMetricStatus(
+                                results.performance.metrics.si?.score,
+                              ),
+                            },
+                            {
+                              label: "Time to Interactive",
+                              value: formatMs(
+                                results.performance.metrics.tti?.value,
+                              ),
+                              status: getMetricStatus(
+                                results.performance.metrics.tti?.score,
+                              ),
+                            },
+                            {
+                              label: "Total Blocking Time",
+                              value: formatMs(
+                                results.performance.metrics.tbt?.value,
+                              ),
+                              status: getMetricStatus(
+                                results.performance.metrics.tbt?.score,
+                              ),
+                            },
+                          ].map((metric) => (
+                            <div
+                              key={metric.label}
+                              className="flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2">
+                                {metric.status === "good" ? (
+                                  <CheckCircle2 className="h-4 w-4 text-success" />
+                                ) : (
+                                  <AlertTriangle className="h-4 w-4 text-warning" />
+                                )}
+                                <span className="text-sm">{metric.label}</span>
+                              </div>
+                              <span className="font-mono text-sm font-semibold">
+                                {metric.value}
+                              </span>
+                            </div>
+                          ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accessibility Analysis */}
+                <div className="bg-card rounded-xl border p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-2xl font-bold mb-2">
+                        Accessibility Analysis
+                      </h3>
+                      <p className="text-base text-muted-foreground">
+                        Comprehensive testing against Web Content Accessibility
+                        Guidelines
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-6 text-base">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-5 w-5 text-destructive" />
+                        <span className="font-bold text-lg">
+                          {displayResults.issues.accessibility}
+                        </span>
+                        <span className="text-muted-foreground font-medium">
+                          Violations
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                        <span className="font-bold text-lg">
+                          {results?.accessibility?.audits?.passed ?? 0}
+                        </span>
+                        <span className="text-muted-foreground font-medium">
+                          Passed
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-3 left-3 flex gap-2">
-                    <span className="px-2 py-1 text-xs bg-background/90 backdrop-blur border rounded">
-                      {selectedDevice === "desktop" ? "1920×1080" : "375×667"}
-                    </span>
-                    <span className="px-2 py-1 text-xs bg-background/90 backdrop-blur border rounded">
-                      Chrome 131
-                    </span>
+
+                  {/* WCAG Compliance Levels */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-bold mb-4">
+                      WCAG Compliance Levels
+                    </h4>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {!results?.accessibility?.wcagCompliance
+                        ? Array.from({ length: 3 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="rounded-lg border bg-card p-4 space-y-3"
+                            >
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                                <div className="space-y-1">
+                                  <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+                                  <div className="h-2 w-24 rounded bg-muted animate-pulse" />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="h-2 w-20 rounded bg-muted animate-pulse" />
+                                  <div className="h-2 w-6 rounded bg-muted animate-pulse" />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="h-2 w-20 rounded bg-muted animate-pulse" />
+                                  <div className="h-2 w-6 rounded bg-muted animate-pulse" />
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-muted animate-pulse" />
+                              </div>
+                            </div>
+                          ))
+                        : [
+                            {
+                              level: "A",
+                              label: "Level A",
+                              description: "Basic accessibility",
+                            },
+                            {
+                              level: "AA",
+                              label: "Level AA",
+                              description: "Enhanced accessibility",
+                            },
+                            {
+                              level: "AAA",
+                              label: "Level AAA",
+                              description: "Advanced accessibility",
+                            },
+                          ].map((item) => {
+                            const violations =
+                              results.accessibility.wcagCompliance[item.level]
+                                ?.violations ?? 0;
+                            const passed = countPassesByLevel(
+                              results.accessibility.passes,
+                              item.level,
+                            );
+                            const total = passed + violations;
+                            const hasViolations = violations > 0;
+                            return (
+                              <div
+                                key={item.level}
+                                className="rounded-lg border bg-card p-4"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className={`flex h-8 w-8 items-center justify-center rounded-full font-bold text-sm ${
+                                        hasViolations
+                                          ? "bg-destructive/10 text-destructive"
+                                          : "bg-success/10 text-success"
+                                      }`}
+                                    >
+                                      {item.level}
+                                    </div>
+                                    <div>
+                                      <div className="font-semibold text-sm">
+                                        {item.label}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {item.description}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                      Passed checks
+                                    </span>
+                                    <span className="font-semibold text-success">
+                                      {passed}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                      Failed checks
+                                    </span>
+                                    <span className="font-semibold text-destructive">
+                                      {violations}
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-muted rounded-full h-1.5">
+                                    <div
+                                      className="bg-primary h-1.5 rounded-full"
+                                      style={{
+                                        width: `${total > 0 ? (passed / total) * 100 : 0}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                    </div>
+                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                      <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p>
+                        <span className="font-semibold">WCAG Levels:</span>{" "}
+                        Level A (minimum), Level AA (recommended for most
+                        websites), Level AAA (highest standard for critical
+                        applications)
+                      </p>
+                    </div>
                   </div>
-                  <button className="absolute bottom-3 right-3 px-3 py-2 text-sm bg-secondary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
-                    <ZoomIn className="h-4 w-4" />
-                    View Full Size
-                  </button>
+
+                  {/* Violations List */}
+                  <div className="mt-6">
+                    <ViolationsList
+                      violations={results.accessibility?.violations || []}
+                      incomplete={results.accessibility?.incomplete || []}
+                    />
+                  </div>
                 </div>
 
-                {/* Core Web Vitals */}
-                <div>
-                  <h4 className="text-lg font-bold mb-4">Core Web Vitals</h4>
-                  <div className="grid gap-4 sm:grid-cols-3">
+                {/* Coming Soon Features */}
+                <div className="border-dashed border-2 rounded-xl bg-card p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Sparkles className="h-6 w-6 text-accent" />
+                    <h3 className="text-2xl font-bold">Coming Soon</h3>
+                  </div>
+                  <p className="text-base text-muted-foreground mb-6">
+                    Future capabilities to help you diagnose, optimize, and fix
+                    your website
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {[
                       {
-                        label: "LCP",
-                        value: "1.2s",
-                        status: "good",
-                        description: "Largest Contentful Paint",
+                        title: "Automated Testing",
+                        description:
+                          "Schedule recurring scans and get alerts for new issues",
+                        icon: Clock,
                       },
                       {
-                        label: "FID",
-                        value: "8ms",
-                        status: "good",
-                        description: "First Input Delay",
+                        title: "GitHub Integration",
+                        description:
+                          "Create pull requests with fixes directly from FastFix",
+                        icon: Github,
                       },
                       {
-                        label: "CLS",
-                        value: "0.05",
-                        status: "good",
-                        description: "Cumulative Layout Shift",
+                        title: "Performance Optimization",
+                        description:
+                          "Image optimization, code splitting, and lazy loading suggestions",
+                        icon: TrendingUp,
                       },
-                    ].map((metric) => (
+                      {
+                        title: "SEO Recommendations",
+                        description:
+                          "Advanced meta tag analysis and structured data validation",
+                        icon: BarChart3,
+                      },
+                      {
+                        title: "Multi-page Crawling",
+                        description:
+                          "Analyze entire website architecture and find broken links",
+                        icon: Search,
+                      },
+                      {
+                        title: "Custom Rules",
+                        description:
+                          "Define your own accessibility and performance standards",
+                        icon: Shield,
+                      },
+                    ].map((feature) => (
                       <div
-                        key={metric.label}
-                        className="rounded-lg border bg-card p-5"
+                        key={feature.title}
+                        className="flex gap-4 items-start"
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-semibold text-muted-foreground">
-                            {metric.description}
-                          </span>
-                          <span
-                            className={`px-2.5 py-1 text-sm font-semibold rounded ${metric.status === "good" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}
-                          >
-                            {metric.status}
-                          </span>
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <feature.icon className="h-6 w-6 text-muted-foreground" />
                         </div>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-bold">
-                            {metric.value}
-                          </span>
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {metric.label}
-                          </span>
+                        <div>
+                          <h3 className="text-lg font-bold mb-2">
+                            {feature.title}
+                          </h3>
+                          <p className="text-base text-muted-foreground">
+                            {feature.description}
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* AI Insights */}
-            {displayResults.aiInsights && (
-              <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <Sparkles className="h-6 w-6 text-accent" />
-                  <h3 className="text-2xl font-bold">AI Insights</h3>
-                </div>
-                <p className="text-base leading-relaxed text-foreground">
-                  {displayResults.aiInsights}
-                </p>
-              </div>
-            )}
-
-            {aiLoading && !displayResults.aiInsights && (
-              <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
-                  <p className="text-sm text-muted-foreground">
-                    Generating AI insights...
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Issue Distribution & Performance Metrics */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="bg-card rounded-xl border p-6">
-                <h3 className="text-2xl font-bold mb-3">Issue Distribution</h3>
-                <p className="text-base text-muted-foreground mb-6">
-                  {Object.values(displayResults.issues).reduce(
-                    (a, b) => a + b,
-                    0,
-                  )}{" "}
-                  total issues detected
-                </p>
-                <div className="space-y-4">
-                  {Object.entries(displayResults.issues).map(([key, value]) => {
-                    const total = Object.values(displayResults.issues).reduce(
-                      (a, b) => a + b,
-                      0,
-                    );
-                    const percentage =
-                      total > 0 ? Math.round((value / total) * 100) : 0;
-                    return (
-                      <div key={key} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium capitalize">
-                            {key.replace(/([A-Z])/g, " $1").trim()}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">
-                              {percentage}%
-                            </span>
-                            <span
-                              className={`px-2 py-0.5 text-xs rounded ${value > 20 ? "bg-destructive/10 text-destructive" : value > 10 ? "bg-secondary" : "border"}`}
-                            >
-                              {value}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-card rounded-xl border p-6">
-                <h3 className="text-2xl font-bold mb-3">Performance Metrics</h3>
-                <p className="text-base text-muted-foreground mb-6">
-                  Key timing measurements
-                </p>
-                <div className="space-y-4">
-                  {[
-                    {
-                      label: "First Contentful Paint",
-                      value: "0.9s",
-                      status: "good",
-                    },
-                    { label: "Speed Index", value: "1.5s", status: "good" },
-                    {
-                      label: "Time to Interactive",
-                      value: "2.1s",
-                      status: "average",
-                    },
-                    {
-                      label: "Total Blocking Time",
-                      value: "180ms",
-                      status: "average",
-                    },
-                  ].map((metric) => (
-                    <div
-                      key={metric.label}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2">
-                        {metric.status === "good" ? (
-                          <CheckCircle2 className="h-4 w-4 text-success" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 text-warning" />
-                        )}
-                        <span className="text-sm">{metric.label}</span>
-                      </div>
-                      <span className="font-mono text-sm font-semibold">
-                        {metric.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Accessibility Analysis */}
-            <div className="bg-card rounded-xl border p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold mb-2">
-                    Accessibility Analysis
-                  </h3>
-                  <p className="text-base text-muted-foreground">
-                    Comprehensive testing against Web Content Accessibility
-                    Guidelines
-                  </p>
-                </div>
-                <div className="flex items-center gap-6 text-base">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-5 w-5 text-destructive" />
-                    <span className="font-bold text-lg">
-                      {displayResults.issues.accessibility}
-                    </span>
-                    <span className="text-muted-foreground font-medium">
-                      Violations
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                    <span className="font-bold text-lg">145</span>
-                    <span className="text-muted-foreground font-medium">
-                      Passed
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* WCAG Compliance Levels */}
-              <div className="mb-6">
-                <h4 className="text-lg font-bold mb-4">
-                  WCAG Compliance Levels
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    {
-                      level: "A",
-                      label: "Level A",
-                      description: "Basic accessibility",
-                      passed: 42,
-                      failed: 3,
-                      status: "warning",
-                    },
-                    {
-                      level: "AA",
-                      label: "Level AA",
-                      description: "Enhanced accessibility",
-                      passed: 78,
-                      failed: 18,
-                      status: "error",
-                    },
-                    {
-                      level: "AAA",
-                      label: "Level AAA",
-                      description: "Advanced accessibility",
-                      passed: 25,
-                      failed: 7,
-                      status: "error",
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.level}
-                      className="rounded-lg border bg-card p-4"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`flex h-8 w-8 items-center justify-center rounded-full font-bold text-sm ${
-                              item.status === "error"
-                                ? "bg-destructive/10 text-destructive"
-                                : "bg-warning/10 text-warning"
-                            }`}
-                          >
-                            {item.level}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-sm">
-                              {item.label}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.description}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            Passed checks
-                          </span>
-                          <span className="font-semibold text-success">
-                            {item.passed}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            Failed checks
-                          </span>
-                          <span className="font-semibold text-destructive">
-                            {item.failed}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-1.5">
-                          <div
-                            className="bg-primary h-1.5 rounded-full"
-                            style={{
-                              width: `${(item.passed / (item.passed + item.failed)) * 100}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>
-                    <span className="font-semibold">WCAG Levels:</span> Level A
-                    (minimum), Level AA (recommended for most websites), Level
-                    AAA (highest standard for critical applications)
-                  </p>
-                </div>
-              </div>
-
-              {/* Violations List */}
-              <div className="mt-6">
-                <ViolationsList
-                  violations={results.accessibility?.violations || []}
-                  incomplete={results.accessibility?.incomplete || []}
-                />
-              </div>
-            </div>
-
-            {/* Coming Soon Features */}
-            <div className="border-dashed border-2 rounded-xl bg-card p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Sparkles className="h-6 w-6 text-accent" />
-                <h3 className="text-2xl font-bold">Coming Soon</h3>
-              </div>
-              <p className="text-base text-muted-foreground mb-6">
-                Future capabilities to help you diagnose, optimize, and fix your
-                website
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[
-                  {
-                    title: "Automated Testing",
-                    description:
-                      "Schedule recurring scans and get alerts for new issues",
-                    icon: Clock,
-                  },
-                  {
-                    title: "GitHub Integration",
-                    description:
-                      "Create pull requests with fixes directly from FastFix",
-                    icon: Github,
-                  },
-                  {
-                    title: "Performance Optimization",
-                    description:
-                      "Image optimization, code splitting, and lazy loading suggestions",
-                    icon: TrendingUp,
-                  },
-                  {
-                    title: "SEO Recommendations",
-                    description:
-                      "Advanced meta tag analysis and structured data validation",
-                    icon: BarChart3,
-                  },
-                  {
-                    title: "Multi-page Crawling",
-                    description:
-                      "Analyze entire website architecture and find broken links",
-                    icon: Search,
-                  },
-                  {
-                    title: "Custom Rules",
-                    description:
-                      "Define your own accessibility and performance standards",
-                    icon: Shield,
-                  },
-                ].map((feature) => (
-                  <div key={feature.title} className="flex gap-4 items-start">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <feature.icon className="h-6 w-6 text-muted-foreground" />
-                    </div>
+              {/* Right Column - Visual Check Sidebar */}
+              <div className="space-y-6">
+                <div className="bg-card rounded-xl border p-6 lg:sticky lg:top-24">
+                  <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h3 className="text-lg font-bold mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-base text-muted-foreground">
-                        {feature.description}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <Camera className="h-5 w-5 text-primary" />
+                        <h3 className="text-xl font-bold">Visual Check</h3>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setSelectedDevice("desktop")}
+                        className={`h-8 w-8 flex items-center justify-center rounded-lg ${
+                          selectedDevice === "desktop"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                      >
+                        <Monitor className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedDevice("mobile")}
+                        className={`h-8 w-8 flex items-center justify-center rounded-lg ${
+                          selectedDevice === "mobile"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted"
+                        }`}
+                      >
+                        <Smartphone className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                ))}
+
+                  <div className="space-y-6">
+                    {/* Main Screenshot */}
+                    <div className="relative group">
+                      <div className="aspect-video rounded-lg border-2 bg-muted overflow-hidden">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <div className="text-center">
+                            <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-xs">Screenshot preview</p>
+                            <p className="text-[10px]">
+                              {selectedDevice === "desktop"
+                                ? "1920×1080"
+                                : "375×667"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-1 text-[10px] bg-background/90 backdrop-blur border rounded">
+                          {selectedDevice === "desktop"
+                            ? "1920×1080"
+                            : "375×667"}
+                        </span>
+                      </div>
+                      <button className="absolute bottom-2 right-2 px-2 py-1 text-xs bg-secondary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <ZoomIn className="h-3 w-3" />
+                        Expand
+                      </button>
+                    </div>
+
+                    {/* Core Web Vitals */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Core Web Vitals
+                      </h4>
+                      <div className="space-y-3">
+                        {!results?.performance?.metrics
+                          ? Array.from({ length: 3 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between rounded-lg border bg-muted/30 p-3"
+                              >
+                                <div className="flex flex-col gap-1">
+                                  <div className="h-2 w-28 rounded bg-muted animate-pulse" />
+                                  <div className="h-4 w-14 rounded bg-muted animate-pulse" />
+                                </div>
+                                <div className="h-6 w-10 rounded bg-muted animate-pulse" />
+                              </div>
+                            ))
+                          : [
+                              {
+                                label: "LCP",
+                                value: formatMs(
+                                  results.performance.metrics.lcp?.value,
+                                ),
+                                status:
+                                  getMetricStatus(
+                                    results.performance.metrics.lcp?.score,
+                                  ) === "good"
+                                    ? "good"
+                                    : "poor",
+                                description: "Largest Contentful Paint",
+                              },
+                              {
+                                label: "TBT",
+                                value: formatMs(
+                                  results.performance.metrics.tbt?.value,
+                                ),
+                                status:
+                                  getMetricStatus(
+                                    results.performance.metrics.tbt?.score,
+                                  ) === "good"
+                                    ? "good"
+                                    : "poor",
+                                description: "Total Blocking Time",
+                              },
+                              {
+                                label: "CLS",
+                                value:
+                                  results.performance.metrics.cls?.value != null
+                                    ? results.performance.metrics.cls.value.toFixed(
+                                        3,
+                                      )
+                                    : "—",
+                                status:
+                                  getMetricStatus(
+                                    results.performance.metrics.cls?.score,
+                                  ) === "good"
+                                    ? "good"
+                                    : "poor",
+                                description: "Cumulative Layout Shift",
+                              },
+                            ].map((metric) => (
+                              <div
+                                key={metric.label}
+                                className="flex items-center justify-between rounded-lg border bg-muted/30 p-3"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {metric.description}
+                                  </span>
+                                  <span className="font-bold text-foreground">
+                                    {metric.value}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`px-2 py-1 text-xs font-semibold rounded ${metric.status === "good" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}
+                                >
+                                  {metric.label}
+                                </span>
+                              </div>
+                            ))}
+                      </div>
+                    </div>
+
+                    {/* Loading Timeline */}
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                        Loading Timeline
+                      </h4>
+                      <div className="grid grid-cols-5 gap-1">
+                        {!results?.performance?.metrics
+                          ? Array.from({ length: 5 }).map((_, i) => (
+                              <div key={i} className="space-y-1">
+                                <div className="aspect-square rounded border bg-muted animate-pulse" />
+                                <div className="h-2 w-full rounded bg-muted animate-pulse" />
+                              </div>
+                            ))
+                          : [
+                              { time: "0s", label: "Start" },
+                              {
+                                time: formatMs(
+                                  results.performance.metrics.fcp?.value,
+                                ),
+                                label: "FCP",
+                              },
+                              {
+                                time: formatMs(
+                                  results.performance.metrics.lcp?.value,
+                                ),
+                                label: "LCP",
+                              },
+                              {
+                                time: formatMs(
+                                  results.performance.metrics.tti?.value,
+                                ),
+                                label: "TTI",
+                              },
+                              {
+                                time: formatMs(
+                                  results.performance.metrics.si?.value,
+                                ),
+                                label: "SI",
+                              },
+                            ].map((frame, i) => (
+                              <div key={i} className="space-y-1">
+                                <div className="aspect-square rounded border bg-muted overflow-hidden">
+                                  <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                                    {i + 1}
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-center text-muted-foreground">
+                                  {frame.time}
+                                </div>
+                              </div>
+                            ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+            {/* Close grid */}
           </div>
         )}
+        )
       </main>
     </div>
   );
