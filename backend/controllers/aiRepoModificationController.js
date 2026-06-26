@@ -1,22 +1,22 @@
-import { Octokit } from '@octokit/rest';
-import { aiProvider } from '../services/ai/index.js';
-import path from 'path';
-import { promises as fs } from 'fs';
+import { Octokit } from "@octokit/rest";
+import { aiProvider } from "../services/ai/index.js";
+import path from "path";
+import { promises as fs } from "fs";
 
 const getGitConfig = async () => {
   try {
-    const configPath = path.join(process.cwd(), 'config.json');
-    const config = await fs.readFile(configPath, 'utf8');
+    const configPath = path.join(process.cwd(), "config.json");
+    const config = await fs.readFile(configPath, "utf8");
     return JSON.parse(config);
-  } catch (error) {
+  } catch {
     throw new Error(
-      'GitHub configuration not found. Please ensure config.json is set up in the backend folder'
+      "GitHub configuration not found. Please ensure config.json is set up in the backend folder",
     );
   }
 };
 
 const suggestChanges = async (content, context) => {
-  const config = await getGitConfig();
+  await getGitConfig();
 
   // Create a simpler prompt template
   const promptTemplate = `
@@ -46,28 +46,28 @@ Format your response as a JSON array with this structure:
 
   try {
     const formattedPrompt = promptTemplate
-      .replace('{content}', content || '')
+      .replace("{content}", content || "")
       .replace(
-        '{context}',
-        typeof context === 'object' ? JSON.stringify(context) : context || ''
+        "{context}",
+        typeof context === "object" ? JSON.stringify(context) : context || "",
       );
 
     const response = await aiProvider.invoke(formattedPrompt);
 
     try {
       return JSON.parse(response);
-    } catch (error) {
-      console.error('Failed to parse AI suggestions:', response);
+    } catch {
+      console.error("Failed to parse AI suggestions:", response);
       return [];
     }
   } catch (error) {
-    console.error('Error in AI suggestion generation:', error);
+    console.error("Error in AI suggestion generation:", error);
     return [];
   }
 };
 
 const generatePRDescription = async (changes, results) => {
-  const config = await getGitConfig();
+  await getGitConfig();
 
   const prompt = `Generate a clear PR description for these changes:
         ${JSON.stringify(changes)}
@@ -85,20 +85,23 @@ const generatePRDescription = async (changes, results) => {
 };
 
 const searchAndModifyWithAI = async (changes) => {
+  let octokit, owner, repo, branchName;
   try {
     const config = await getGitConfig();
-    const { githubToken, owner, repo } = config;
+    const { githubToken } = config;
+    owner = config.owner;
+    repo = config.repo;
 
-    const octokit = new Octokit({
+    octokit = new Octokit({
       auth: githubToken,
     });
 
     // Create a new branch
-    const branchName = `ai-fix-${Date.now()}`;
+    branchName = `ai-fix-${Date.now()}`;
     const { data: ref } = await octokit.git.getRef({
       owner,
       repo,
-      ref: 'heads/main',
+      ref: "heads/main",
     });
 
     await octokit.git.createRef({
@@ -113,7 +116,7 @@ const searchAndModifyWithAI = async (changes) => {
       owner,
       repo,
       tree_sha: ref.object.sha,
-      recursive: 'true',
+      recursive: "true",
     });
 
     const results = [];
@@ -121,7 +124,7 @@ const searchAndModifyWithAI = async (changes) => {
 
     // Process each file
     for (const file of tree.tree) {
-      if (file.type === 'blob') {
+      if (file.type === "blob") {
         try {
           const { data: content } = await octokit.repos.getContent({
             owner,
@@ -129,7 +132,7 @@ const searchAndModifyWithAI = async (changes) => {
             path: file.path,
           });
 
-          const fileContent = Buffer.from(content.content, 'base64').toString();
+          const fileContent = Buffer.from(content.content, "base64").toString();
 
           // Check if file contains any of the search texts
           let needsModification = false;
@@ -154,8 +157,8 @@ const searchAndModifyWithAI = async (changes) => {
 
             for (const change of allChanges) {
               const findRegex = new RegExp(
-                change.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-                'g'
+                change.findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+                "g",
               );
               newContent = newContent.replace(findRegex, change.replaceText);
             }
@@ -165,15 +168,15 @@ const searchAndModifyWithAI = async (changes) => {
               owner,
               repo,
               path: file.path,
-              message: 'AI-assisted automatic fix',
-              content: Buffer.from(newContent).toString('base64'),
+              message: "AI-assisted automatic fix",
+              content: Buffer.from(newContent).toString("base64"),
               branch: branchName,
               sha: content.sha,
             });
 
             results.push({
               filePath: file.path,
-              status: 'success',
+              status: "success",
               newContent,
               aiSuggestions: suggestions,
             });
@@ -182,7 +185,7 @@ const searchAndModifyWithAI = async (changes) => {
           console.error(`Error processing file ${file.path}:`, error);
           results.push({
             filePath: file.path,
-            status: 'error',
+            status: "error",
             error: error.message,
           });
         }
@@ -191,29 +194,29 @@ const searchAndModifyWithAI = async (changes) => {
 
     // Check if any changes were made
     if (results.length === 0) {
-      throw new Error('No matching content found to modify');
+      throw new Error("No matching content found to modify");
     }
 
     // Check if any successful changes were made
-    const successfulChanges = results.filter((r) => r.status === 'success');
+    const successfulChanges = results.filter((r) => r.status === "success");
     if (successfulChanges.length === 0) {
-      throw new Error('No successful modifications were made');
+      throw new Error("No successful modifications were made");
     }
 
     // Generate AI-powered PR description
     const prDescription = await generatePRDescription(
       changes,
-      successfulChanges
+      successfulChanges,
     );
 
     // Create pull request
     const { data: pullRequest } = await octokit.pulls.create({
       owner,
       repo,
-      title: 'AI-Assisted: Automatic fixes',
+      title: "AI-Assisted: Automatic fixes",
       body: prDescription,
       head: branchName,
-      base: 'main',
+      base: "main",
     });
 
     return {
@@ -223,7 +226,13 @@ const searchAndModifyWithAI = async (changes) => {
     };
   } catch (error) {
     // Clean up the branch if there was an error
-    if (error.message.includes('No commits between')) {
+    if (
+      error.message.includes("No commits between") &&
+      octokit &&
+      owner &&
+      repo &&
+      branchName
+    ) {
       try {
         await octokit.git.deleteRef({
           owner,
@@ -231,7 +240,7 @@ const searchAndModifyWithAI = async (changes) => {
           ref: `heads/${branchName}`,
         });
       } catch (deleteError) {
-        console.error('Failed to delete branch:', deleteError);
+        console.error("Failed to delete branch:", deleteError);
       }
     }
     throw new Error(`Failed to modify files: ${error.message}`);
@@ -244,7 +253,7 @@ export const aiModifyRepo = async (req, res) => {
 
     if (!Array.isArray(changes) || changes.length === 0) {
       return res.status(400).json({
-        error: 'Required field missing: changes array with modifications',
+        error: "Required field missing: changes array with modifications",
       });
     }
 
@@ -252,15 +261,14 @@ export const aiModifyRepo = async (req, res) => {
     for (const change of changes) {
       if (!change.findText || !change.replaceText) {
         return res.status(400).json({
-          error: 'Each change must include findText and replaceText',
+          error: "Each change must include findText and replaceText",
         });
       }
     }
 
     // Process changes with AI assistance
-    const { results, pullRequest, aiSuggestions } = await searchAndModifyWithAI(
-      changes
-    );
+    const { results, pullRequest, aiSuggestions } =
+      await searchAndModifyWithAI(changes);
 
     res.json({
       results,

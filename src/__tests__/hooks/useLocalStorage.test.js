@@ -5,13 +5,13 @@
  * Uses React Testing Library's renderHook utility.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import useLocalStorage from '../../hooks/useLocalStorage.js';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import useLocalStorage from "../../hooks/useLocalStorage.js";
 
-describe('useLocalStorage Hook', () => {
-  const TEST_KEY = 'test-key';
-  const TEST_VALUE = { data: 'test' };
+describe("useLocalStorage Hook", () => {
+  const TEST_KEY = "test-key";
+  const TEST_VALUE = { data: "test" };
 
   beforeEach(() => {
     // Clear localStorage before each test
@@ -23,31 +23,31 @@ describe('useLocalStorage Hook', () => {
     localStorage.clear();
   });
 
-  describe('initialization', () => {
-    it('should return initial value when localStorage is empty', () => {
+  describe("initialization", () => {
+    it("should return initial value when localStorage is empty", () => {
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
       expect(result.current[0]).toEqual(TEST_VALUE);
     });
 
-    it('should return stored value when localStorage has data', () => {
-      const storedValue = { data: 'stored' };
+    it("should return stored value when localStorage has data", () => {
+      const storedValue = { data: "stored" };
       localStorage.setItem(TEST_KEY, JSON.stringify(storedValue));
 
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
       expect(result.current[0]).toEqual(storedValue);
     });
 
-    it('should handle invalid JSON in localStorage', () => {
-      localStorage.setItem(TEST_KEY, 'invalid json');
+    it("should handle invalid JSON in localStorage", () => {
+      localStorage.setItem(TEST_KEY, "invalid json");
 
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
       // Should fall back to initial value
@@ -55,13 +55,13 @@ describe('useLocalStorage Hook', () => {
     });
   });
 
-  describe('setValue', () => {
-    it('should update value and localStorage', () => {
+  describe("setValue", () => {
+    it("should update value and localStorage", () => {
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
-      const newValue = { data: 'updated' };
+      const newValue = { data: "updated" };
 
       act(() => {
         result.current[1](newValue);
@@ -71,9 +71,9 @@ describe('useLocalStorage Hook', () => {
       expect(localStorage.getItem(TEST_KEY)).toBe(JSON.stringify(newValue));
     });
 
-    it('should handle function updates', () => {
+    it("should handle function updates", () => {
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, { count: 0 })
+        useLocalStorage(TEST_KEY, { count: 0 }),
       );
 
       act(() => {
@@ -83,9 +83,9 @@ describe('useLocalStorage Hook', () => {
       expect(result.current[0]).toEqual({ count: 1 });
     });
 
-    it('should handle null values', () => {
+    it("should handle null values", () => {
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
       act(() => {
@@ -93,17 +93,17 @@ describe('useLocalStorage Hook', () => {
       });
 
       expect(result.current[0]).toBeNull();
-      expect(localStorage.getItem(TEST_KEY)).toBe('null');
+      expect(localStorage.getItem(TEST_KEY)).toBe("null");
     });
   });
 
-  describe('persistence', () => {
-    it('should persist across hook re-renders', () => {
+  describe("persistence", () => {
+    it("should persist across hook re-renders", () => {
       const { result, rerender } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
-      const newValue = { data: 'persisted' };
+      const newValue = { data: "persisted" };
 
       act(() => {
         result.current[1](newValue);
@@ -114,21 +114,23 @@ describe('useLocalStorage Hook', () => {
       expect(result.current[0]).toEqual(newValue);
     });
 
-    it('should sync with localStorage changes', () => {
+    it("should sync with localStorage changes", () => {
       const { result } = renderHook(() =>
-        useLocalStorage(TEST_KEY, TEST_VALUE)
+        useLocalStorage(TEST_KEY, TEST_VALUE),
       );
 
-      const newValue = { data: 'external' };
+      const newValue = { data: "external" };
       localStorage.setItem(TEST_KEY, JSON.stringify(newValue));
 
       // Trigger storage event
-      window.dispatchEvent(
-        new StorageEvent('storage', {
-          key: TEST_KEY,
-          newValue: JSON.stringify(newValue),
-        })
-      );
+      act(() => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: TEST_KEY,
+            newValue: JSON.stringify(newValue),
+          }),
+        );
+      });
 
       expect(result.current[0]).toEqual(newValue);
     });

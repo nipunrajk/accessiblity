@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Header } from "../components/Header";
 import { useAnalysis } from "../hooks/useAnalysis";
 import LoadingState from "../components/LoadingState";
+import ErrorState from "../components/ErrorState";
 import ViolationsList from "../components/ViolationsList";
 import {
   Search,
@@ -26,11 +27,13 @@ import {
   Info,
   Github,
   Shield,
+  RefreshCw,
 } from "lucide-react";
 
 export default function Analyzer() {
   const [url, setUrl] = useState("");
   const [selectedDevice, setSelectedDevice] = useState("desktop");
+  const [shareCopied, setShareCopied] = useState(false);
 
   const {
     loading,
@@ -38,6 +41,8 @@ export default function Analyzer() {
     error,
     aiAnalysis,
     aiLoading,
+    aiError,
+    domScanError,
     websiteUrl,
     scanStats,
     runAnalysis,
@@ -52,6 +57,16 @@ export default function Analyzer() {
   const handleNewAnalysis = () => {
     clearAnalysis();
     setUrl("");
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // clipboard not available (e.g. non-HTTPS) — fall back silently
+    }
   };
 
   // Transform results to match the display format
@@ -73,6 +88,12 @@ export default function Analyzer() {
         },
       }
     : null;
+
+  // Call 1 — empty result: all scores zero or null means the scan ran but returned
+  // no usable data (e.g. page blocked crawler, required auth, or timed out).
+  const isEmptyResult =
+    !!displayResults &&
+    Object.values(displayResults.scores).every((s) => s == null || s === 0);
 
   const getScoreColor = (score) => {
     if (score >= 90) return "text-success";
@@ -132,23 +153,18 @@ export default function Analyzer() {
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Error State */}
+        {/* Call 1 — error state: fetch failed, timeout, or backend error */}
         {error && (
           <div className="max-w-3xl mx-auto mb-6">
-            <div className="bg-destructive/10 border-2 border-destructive/20 rounded-xl p-6">
-              <div className="flex items-center gap-3">
-                <XCircle className="w-6 h-6 text-destructive" />
-                <div>
-                  <h3 className="font-semibold text-destructive">
-                    Analysis Error
-                  </h3>
-                  <p className="text-sm text-foreground">{error}</p>
-                </div>
-              </div>
-            </div>
+            <ErrorState
+              message={error}
+              onRetry={websiteUrl ? () => runAnalysis(websiteUrl) : undefined}
+            />
           </div>
         )}
+
         {!displayResults ? (
+          /* ── Home / URL input ── */
           <div className="mx-auto max-w-3xl">
             <div className="mb-8 text-center">
               <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
@@ -223,7 +239,44 @@ export default function Analyzer() {
               ))}
             </div>
           </div>
+        ) : isEmptyResult ? (
+          /* ── Call 1 — empty result: named empty state ── */
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-card border-2 rounded-xl p-10 text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-warning/10">
+                  <AlertTriangle className="h-9 w-9 text-warning" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold mb-2">
+                  Scan returned no usable data
+                </h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  The scan completed but all scores came back as zero. This
+                  usually means the page blocked the crawler, requires a login,
+                  or failed to load before the timeout.
+                </p>
+              </div>
+              <div className="flex justify-center gap-3 pt-2">
+                <button
+                  onClick={() => runAnalysis(websiteUrl)}
+                  className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Try again
+                </button>
+                <button
+                  onClick={handleNewAnalysis}
+                  className="px-6 py-2.5 border rounded-lg font-medium hover:bg-accent"
+                >
+                  New analysis
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* ── Results view ── */
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -245,9 +298,12 @@ export default function Analyzer() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button className="px-5 py-2.5 text-base font-medium border rounded-lg hover:bg-accent flex items-center gap-2">
+                <button
+                  onClick={handleShare}
+                  className="px-5 py-2.5 text-base font-medium border rounded-lg hover:bg-accent flex items-center gap-2"
+                >
                   <Share2 className="h-5 w-5" />
-                  Share
+                  {shareCopied ? "Link copied" : "Share"}
                 </button>
                 <button className="px-5 py-2.5 text-base font-medium border rounded-lg hover:bg-accent flex items-center gap-2">
                   <Download className="h-5 w-5" />
@@ -315,7 +371,7 @@ export default function Analyzer() {
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Left Column - Main Data */}
               <div className="space-y-6 lg:col-span-2">
-                {/* AI Insights */}
+                {/* Call 2 — AI Insights: show insights, loading spinner, or error */}
                 {displayResults.aiInsights && (
                   <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
                     <div className="flex items-center gap-3 mb-4">
@@ -336,6 +392,17 @@ export default function Analyzer() {
                         Generating AI insights...
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Call 2 + 3 — AI error: shown when AI analysis or fix generation failed */}
+                {!aiLoading && !displayResults.aiInsights && aiError && (
+                  <div className="border-2 border-accent/20 bg-accent/5 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Sparkles className="h-6 w-6 text-accent" />
+                      <h3 className="text-2xl font-bold">AI Insights</h3>
+                    </div>
+                    <ErrorState message={aiError} />
                   </div>
                 )}
 
@@ -636,6 +703,15 @@ export default function Analyzer() {
                       incomplete={results.accessibility?.incomplete || []}
                     />
                   </div>
+
+                  {/* Call 4 — DOM scan error: non-blocking notice below violations */}
+                  {domScanError && (
+                    <div className="mt-4">
+                      <ErrorState
+                        message={`Element-level scan unavailable: ${domScanError}`}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Coming Soon Features */}
@@ -913,10 +989,8 @@ export default function Analyzer() {
                 </div>
               </div>
             </div>
-            {/* Close grid */}
           </div>
         )}
-        )
       </main>
     </div>
   );

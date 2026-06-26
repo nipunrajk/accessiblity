@@ -1,19 +1,34 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Function to get fix suggestions for issues using backend endpoint
 export const getFixSuggestions = async (issues) => {
   try {
     // Use backend AI endpoint instead of direct API calls
-    const response = await fetch('/api/ai-fixes', {
-      method: 'POST',
+    const response = await fetch("/api/ai-fixes", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ issues }),
     });
 
     if (!response.ok) {
-      throw new Error(`Backend AI service error: ${response.statusText}`);
+      // Read the JSON body to get the structured error code the backend returns.
+      let errorCode = null;
+      try {
+        const errorBody = await response.json();
+        errorCode = errorBody.error || null;
+      } catch {
+        // Body is not JSON — fall through with no code.
+      }
+      const err = new Error(
+        errorCode
+          ? `AI service error: ${errorCode}`
+          : `Backend error (${response.status})`,
+      );
+      err.code = errorCode;
+      err.status = response.status;
+      throw err;
     }
 
     const { suggestions } = await response.json();
@@ -27,13 +42,19 @@ export const getFixSuggestions = async (issues) => {
           code: rec.codeExample,
           impact: rec.expectedImpact,
           implementation: rec.implementation,
-        })
+        }),
       );
     });
 
     return transformedSuggestions;
   } catch (error) {
-    throw new Error('Failed to get fix suggestions: ' + error.message);
+    // Preserve code and status so callers can distinguish permanent vs transient errors.
+    const wrapped = new Error(
+      "Failed to get fix suggestions: " + error.message,
+    );
+    wrapped.code = error.code ?? null;
+    wrapped.status = error.status ?? null;
+    throw wrapped;
   }
 };
 
@@ -41,7 +62,7 @@ export const getFixSuggestions = async (issues) => {
 export const applyFix = async (issue, fixSuggestion) => {
   try {
     if (!fixSuggestion || !fixSuggestion.code) {
-      throw new Error('Invalid fix suggestion');
+      throw new Error("Invalid fix suggestion");
     }
 
     // Simulate API delay
@@ -50,11 +71,11 @@ export const applyFix = async (issue, fixSuggestion) => {
     // Mock successful fix application
     return {
       success: true,
-      message: 'Fix applied successfully',
+      message: "Fix applied successfully",
       changes: fixSuggestion.code,
     };
   } catch (error) {
-    throw new Error('Failed to apply fix: ' + error.message);
+    throw new Error("Failed to apply fix: " + error.message);
   }
 };
 
@@ -72,7 +93,7 @@ const generateDirectSelector = (element) => {
     : targetElement.nodeName.toLowerCase();
 
   // Check for ID
-  const id = targetElement.id || targetElement.getAttribute?.('id');
+  const id = targetElement.id || targetElement.getAttribute?.("id");
   if (id) {
     return `#${id}`;
   }
@@ -80,8 +101,8 @@ const generateDirectSelector = (element) => {
   // Get classes
   const classList =
     targetElement.classList ||
-    (targetElement.className ? targetElement.className.split(' ') : []) ||
-    targetElement.getAttribute?.('class')?.split(' ') ||
+    (targetElement.className ? targetElement.className.split(" ") : []) ||
+    targetElement.getAttribute?.("class")?.split(" ") ||
     [];
 
   // If element has classes, use them
@@ -90,13 +111,13 @@ const generateDirectSelector = (element) => {
       .filter((cls) => cls && cls.trim())
       .map((cls) => `.${cls.trim()}`);
     if (uniqueClasses.length > 0) {
-      return `${tagName}${uniqueClasses.join('')}`;
+      return `${tagName}${uniqueClasses.join("")}`;
     }
   }
 
   // If no classes or ID, try to find a unique attribute
-  const attributes = ['src', 'href', 'role', 'type', 'name'].filter(
-    (attr) => targetElement.getAttribute?.(attr) || targetElement[attr]
+  const attributes = ["src", "href", "role", "type", "name"].filter(
+    (attr) => targetElement.getAttribute?.(attr) || targetElement[attr],
   );
 
   if (attributes.length > 0) {
@@ -104,7 +125,7 @@ const generateDirectSelector = (element) => {
     const value = targetElement.getAttribute?.(attr) || targetElement[attr];
     // Use the last part of the path for src/href to keep it shorter
     const attrValue =
-      attr === 'src' || attr === 'href' ? value.split('/').pop() : value;
+      attr === "src" || attr === "href" ? value.split("/").pop() : value;
     return `${tagName}[${attr}="${attrValue}"]`;
   }
 
@@ -112,7 +133,7 @@ const generateDirectSelector = (element) => {
   const uniqueId = Math.random().toString(36).substr(2, 9);
   const dataAttr = `data-element="${tagName}-${uniqueId}"`;
   if (targetElement.setAttribute) {
-    targetElement.setAttribute('data-element', `${tagName}-${uniqueId}`);
+    targetElement.setAttribute("data-element", `${tagName}-${uniqueId}`);
   }
   return `${tagName}[${dataAttr}]`;
 };
@@ -123,19 +144,19 @@ export const getAffectedElements = async (url, issueType) => {
     // Create a selector based on issue type
     const getSelector = (type) => {
       switch (type) {
-        case 'missing-alt':
+        case "missing-alt":
           return {
             baseSelector: 'img:not([alt]), img[alt=""]',
-            targetTag: 'img',
+            targetTag: "img",
             directOnly: true,
           };
-        case 'image-size':
+        case "image-size":
           return {
-            baseSelector: 'img[src]:not([width]):not([height])',
-            targetTag: 'img',
+            baseSelector: "img[src]:not([width]):not([height])",
+            targetTag: "img",
             directOnly: true,
           };
-        case 'color-contrast':
+        case "color-contrast":
           return {
             // Direct selectors for text elements
             baseSelector: `
@@ -144,22 +165,22 @@ export const getAffectedElements = async (url, issueType) => {
               *[style*="color"]
             `,
             targetTag: [
-              'p',
-              'h1',
-              'h2',
-              'h3',
-              'h4',
-              'h5',
-              'h6',
-              'span',
-              'a',
-              'button',
-              'label',
-              'div',
+              "p",
+              "h1",
+              "h2",
+              "h3",
+              "h4",
+              "h5",
+              "h6",
+              "span",
+              "a",
+              "button",
+              "label",
+              "div",
             ],
             directOnly: true,
           };
-        case 'keyboard-nav':
+        case "keyboard-nav":
           return {
             // Direct selectors for interactive elements
             baseSelector: `
@@ -167,45 +188,45 @@ export const getAffectedElements = async (url, issueType) => {
               [role="button"], [role="link"], [role="tab"],
               [tabindex]
             `,
-            targetTag: ['a', 'button', 'input', 'select', 'textarea'],
+            targetTag: ["a", "button", "input", "select", "textarea"],
             directOnly: true,
           };
-        case 'aria-label':
+        case "aria-label":
           return {
             // Direct selectors for elements needing ARIA labels
             baseSelector: `
               button, a[href], input, select, textarea,
               [role], [aria-label], [aria-labelledby]
             `,
-            targetTag: ['button', 'a', 'input', 'select', 'textarea'],
+            targetTag: ["button", "a", "input", "select", "textarea"],
             directOnly: true,
           };
-        case 'form-label':
+        case "form-label":
           return {
             // Direct selectors for form elements
             baseSelector: `
               input:not([type="hidden"]), select, textarea,
               [role="textbox"], [role="combobox"], [role="listbox"]
             `,
-            targetTag: ['input', 'select', 'textarea'],
+            targetTag: ["input", "select", "textarea"],
             directOnly: true,
           };
-        case 'heading-order':
+        case "heading-order":
           return {
-            baseSelector: 'h1, h2, h3, h4, h5, h6',
-            targetTag: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+            baseSelector: "h1, h2, h3, h4, h5, h6",
+            targetTag: ["h1", "h2", "h3", "h4", "h5", "h6"],
             directOnly: true,
           };
-        case 'link-text':
+        case "link-text":
           return {
             baseSelector: "a[href], [role='link']",
-            targetTag: ['a'],
+            targetTag: ["a"],
             directOnly: true,
           };
         default:
           return {
-            baseSelector: '*[data-accessibility-issue]',
-            targetTag: '*',
+            baseSelector: "*[data-accessibility-issue]",
+            targetTag: "*",
             directOnly: true,
           };
       }
@@ -213,7 +234,7 @@ export const getAffectedElements = async (url, issueType) => {
 
     const selectorInfo = getSelector(issueType);
 
-    const response = await axios.post('/api/analyze-elements', {
+    const response = await axios.post("/api/analyze-elements", {
       url,
       selector: selectorInfo.baseSelector,
       targetTag: selectorInfo.targetTag,
@@ -233,39 +254,39 @@ export const getAffectedElements = async (url, issueType) => {
 
     return elements;
   } catch (error) {
-    throw new Error('Failed to get affected elements: ' + error.message);
+    throw new Error("Failed to get affected elements: " + error.message);
   }
 };
 
 // Enhanced validation function
 export const validateFix = async (issue, appliedFix, element) => {
   try {
-    const validationChecks = {
-      'missing-alt': (el) =>
-        el.hasAttribute('alt') && el.getAttribute('alt').trim() !== '',
-      'image-size': (el) =>
-        el.hasAttribute('width') && el.hasAttribute('height'),
-      'color-contrast': (el) => {
+    const _validationChecks = {
+      "missing-alt": (el) =>
+        el.hasAttribute("alt") && el.getAttribute("alt").trim() !== "",
+      "image-size": (el) =>
+        el.hasAttribute("width") && el.hasAttribute("height"),
+      "color-contrast": (_el) => {
         // Would need to implement color contrast calculation
         return true; // Placeholder
       },
-      'keyboard-nav': (el) => {
-        const tabindex = el.getAttribute('tabindex');
+      "keyboard-nav": (el) => {
+        const tabindex = el.getAttribute("tabindex");
         return tabindex === null || parseInt(tabindex) >= 0;
       },
-      'aria-label': (el) =>
-        el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby'),
-      'form-label': (el) => {
-        const id = el.getAttribute('id');
+      "aria-label": (el) =>
+        el.hasAttribute("aria-label") || el.hasAttribute("aria-labelledby"),
+      "form-label": (el) => {
+        const id = el.getAttribute("id");
         return id
           ? document.querySelector(`label[for="${id}"]`) !== null
           : false;
       },
-      'heading-order': (el) => {
+      "heading-order": (_el) => {
         // Validate heading order
         return true; // Placeholder
       },
-      'link-text': (el) => {
+      "link-text": (el) => {
         const text = el.textContent || el.innerText;
         return text && text.trim().length > 0;
       },
@@ -275,7 +296,7 @@ export const validateFix = async (issue, appliedFix, element) => {
     const elementSelector = element.directSelector;
 
     // Simulate validation with API call
-    const response = await axios.post('/api/validate-fix', {
+    const response = await axios.post("/api/validate-fix", {
       issue,
       element: {
         ...element,
@@ -287,11 +308,11 @@ export const validateFix = async (issue, appliedFix, element) => {
 
     return {
       success: response.data.success,
-      message: response.data.message || 'Fix has been validated successfully',
+      message: response.data.message || "Fix has been validated successfully",
       details: response.data.details || {},
       selector: elementSelector,
     };
   } catch (error) {
-    throw new Error('Failed to validate fix: ' + error.message);
+    throw new Error("Failed to validate fix: " + error.message);
   }
 };
