@@ -1,5 +1,5 @@
 import { useState, FormEvent, ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 // @ts-ignore
 import { STORAGE_KEYS } from '../constants';
@@ -130,6 +130,7 @@ function Login() {
   const [localError, setLocalError] = useState('');
 
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useAuthStore((state) => state.login);
   const isLoading = useAuthStore((state) => state.isLoading);
   const authError = useAuthStore((state) => state.error);
@@ -160,7 +161,7 @@ function Login() {
       });
 
       sessionStorage.setItem('freshLogin', 'true');
-      navigate('/analyzer');
+      navigate(location.state?.from?.pathname ?? '/analyzer', { replace: true });
     } catch (error) {
       setLocalError(authError || 'Login failed. Please try again.');
     }

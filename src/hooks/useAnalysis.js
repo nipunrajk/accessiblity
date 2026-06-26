@@ -3,17 +3,17 @@
  * Main orchestration hook for website analysis
  * Coordinates Lighthouse, AI analysis, and DOM scanning
  */
-import { useNavigate } from 'react-router-dom';
-import { useAnalysisContext } from '../contexts/AnalysisContext';
-import { useLighthouse } from './useLighthouse';
-import { useAIAnalysis } from './useAIAnalysis';
-import { useDOMScanner } from './useDOMScanner';
-import { handleError, createAnalysisError } from '../utils/errorHandler';
-import logger from '../utils/logger';
+import { useNavigate } from "react-router-dom";
+import { useAnalysisContext } from "../contexts/AnalysisContext";
+import { useLighthouse } from "./useLighthouse";
+import { useAIAnalysis } from "./useAIAnalysis";
+import { useDOMScanner } from "./useDOMScanner";
+import { handleError, createAnalysisError } from "../utils/errorHandler";
+import logger from "../utils/logger";
 
-const DEMO_URL = 'https://example-demo-site.com';
+const DEMO_URL = "https://example-demo-site.com";
 const DEMO_AI_MESSAGE =
-  'This demo website shows common accessibility and performance issues. The missing alt text on images makes content inaccessible to screen readers. The large unoptimized images are slowing down page load times. Consider adding descriptive alt text and optimizing image sizes for better user experience.';
+  "This demo website shows common accessibility and performance issues. The missing alt text on images makes content inaccessible to screen readers. The large unoptimized images are slowing down page load times. Consider adding descriptive alt text and optimizing image sizes for better user experience.";
 
 /**
  * @typedef {Object} AnalysisState
@@ -80,8 +80,13 @@ export const useAnalysis = () => {
 
   const navigate = useNavigate();
   const { runLighthouse } = useLighthouse();
-  const { runAIAnalysis, generateFixes, aiAvailable } = useAIAnalysis();
-  const { scanElements } = useDOMScanner();
+  const {
+    runAIAnalysis,
+    generateFixes,
+    aiAvailable,
+    error: aiError,
+  } = useAIAnalysis();
+  const { scanElements, error: domScanError } = useDOMScanner();
 
   /**
    * Clear analysis state
@@ -89,10 +94,10 @@ export const useAnalysis = () => {
    */
   const clearState = () => {
     const emptyStats = { pagesScanned: 0, totalPages: 0, scannedUrls: [] };
-    dispatch({ type: 'SET_RESULTS', payload: null });
-    dispatch({ type: 'SET_AI_ANALYSIS', payload: null });
-    dispatch({ type: 'SET_AI_FIXES', payload: null });
-    dispatch({ type: 'SET_SCAN_STATS', payload: emptyStats });
+    dispatch({ type: "SET_RESULTS", payload: null });
+    dispatch({ type: "SET_AI_ANALYSIS", payload: null });
+    dispatch({ type: "SET_AI_FIXES", payload: null });
+    dispatch({ type: "SET_SCAN_STATS", payload: emptyStats });
     clearPersistedData();
   };
 
@@ -102,26 +107,26 @@ export const useAnalysis = () => {
    */
   const handleDemoAnalysis = async () => {
     try {
-      const { sampleAnalysisResults } = await import('../data/sampleData.js');
-      dispatch({ type: 'SET_WEBSITE_URL', payload: DEMO_URL });
-      dispatch({ type: 'SET_RESULTS', payload: sampleAnalysisResults });
+      const { sampleAnalysisResults } = await import("../data/sampleData.js");
+      dispatch({ type: "SET_WEBSITE_URL", payload: DEMO_URL });
+      dispatch({ type: "SET_RESULTS", payload: sampleAnalysisResults });
       dispatch({
-        type: 'SET_SCAN_STATS',
+        type: "SET_SCAN_STATS",
         payload: { pagesScanned: 1, totalPages: 1, scannedUrls: [DEMO_URL] },
       });
 
       if (aiAvailable) {
-        dispatch({ type: 'SET_AI_LOADING', payload: true });
+        dispatch({ type: "SET_AI_LOADING", payload: true });
         setTimeout(() => {
-          dispatch({ type: 'SET_AI_ANALYSIS', payload: DEMO_AI_MESSAGE });
-          dispatch({ type: 'SET_AI_LOADING', payload: false });
+          dispatch({ type: "SET_AI_ANALYSIS", payload: DEMO_AI_MESSAGE });
+          dispatch({ type: "SET_AI_LOADING", payload: false });
         }, 2000);
       }
 
       navigate(`/analyze/demo-${Date.now()}`);
     } catch (demoError) {
-      logger.error('Failed to load demo data', demoError);
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to load demo data' });
+      logger.error("Failed to load demo data", demoError);
+      dispatch({ type: "SET_ERROR", payload: "Failed to load demo data" });
     }
   };
 
@@ -132,7 +137,7 @@ export const useAnalysis = () => {
    * @param {string} url - Website URL
    */
   const runAIProcessing = async (lighthouseResults, url) => {
-    dispatch({ type: 'SET_AI_LOADING', payload: true });
+    dispatch({ type: "SET_AI_LOADING", payload: true });
     try {
       const startTime = performance.now();
 
@@ -143,15 +148,15 @@ export const useAnalysis = () => {
       ]);
 
       const parallelTime = performance.now() - startTime;
-      logger.performance('Parallel AI processing completed', {
+      logger.performance("Parallel AI processing completed", {
         duration: parallelTime,
       });
 
       if (aiAnalysisResult) {
-        dispatch({ type: 'SET_AI_ANALYSIS', payload: aiAnalysisResult });
+        dispatch({ type: "SET_AI_ANALYSIS", payload: aiAnalysisResult });
       }
-      dispatch({ type: 'SET_SCANNED_ELEMENTS', payload: elements });
-      dispatch({ type: 'SET_ELEMENT_ISSUES', payload: elements });
+      dispatch({ type: "SET_SCANNED_ELEMENTS", payload: elements });
+      dispatch({ type: "SET_ELEMENT_ISSUES", payload: elements });
 
       // Collect all issues for fix generation
       const allIssues = [
@@ -168,19 +173,19 @@ export const useAnalysis = () => {
         const fixes = await generateFixes(allIssues);
         const fixTime = performance.now() - fixStartTime;
 
-        logger.performance('AI fix generation completed', {
+        logger.performance("AI fix generation completed", {
           duration: fixTime,
           issueCount: allIssues.length,
         });
 
-        if (fixes) dispatch({ type: 'SET_AI_FIXES', payload: fixes });
+        if (fixes) dispatch({ type: "SET_AI_FIXES", payload: fixes });
       }
     } catch (error) {
-      logger.warn('AI processing error, continuing with basic analysis', {
+      logger.warn("AI processing error, continuing with basic analysis", {
         error: error.message,
       });
     } finally {
-      dispatch({ type: 'SET_AI_LOADING', payload: false });
+      dispatch({ type: "SET_AI_LOADING", payload: false });
     }
   };
 
@@ -198,24 +203,24 @@ export const useAnalysis = () => {
    * await runAnalysis('demo');
    */
   const runAnalysis = async (url) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: "SET_LOADING", payload: true });
+    dispatch({ type: "SET_ERROR", payload: null });
     clearState();
 
-    if (url === 'demo' || url === 'sample') {
+    if (url === "demo" || url === "sample") {
       await handleDemoAnalysis();
       return;
     }
 
-    dispatch({ type: 'SET_WEBSITE_URL', payload: url });
+    dispatch({ type: "SET_WEBSITE_URL", payload: url });
 
     try {
       const lighthouseResults = await runLighthouse(url, (progress) =>
-        dispatch({ type: 'SET_SCAN_STATS', payload: progress })
+        dispatch({ type: "SET_SCAN_STATS", payload: progress }),
       );
 
       dispatch({
-        type: 'SET_RESULTS',
+        type: "SET_RESULTS",
         payload: {
           performance: lighthouseResults.performance,
           accessibility: lighthouseResults.accessibility,
@@ -224,7 +229,7 @@ export const useAnalysis = () => {
         },
       });
       dispatch({
-        type: 'SET_SCAN_STATS',
+        type: "SET_SCAN_STATS",
         payload: lighthouseResults.scanStats,
       });
 
@@ -232,15 +237,15 @@ export const useAnalysis = () => {
 
       navigate(`/analyze/${Date.now()}`);
     } catch (err) {
-      const error = createAnalysisError('Website analysis failed', err, {
+      const error = createAnalysisError("Website analysis failed", err, {
         url,
       });
       const errorInfo = handleError(error);
-      dispatch({ type: 'SET_ERROR', payload: errorInfo.message });
-      logger.error('Analysis failed', err, { url });
+      dispatch({ type: "SET_ERROR", payload: errorInfo.message });
+      logger.error("Analysis failed", err, { url });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      dispatch({ type: 'SET_AI_LOADING', payload: false });
+      dispatch({ type: "SET_LOADING", payload: false });
+      dispatch({ type: "SET_AI_LOADING", payload: false });
     }
   };
 
@@ -261,7 +266,7 @@ export const useAnalysis = () => {
       ...(Array.isArray(elementIssues) ? elementIssues : []),
     ];
 
-    navigate('/ai-fix', {
+    navigate("/ai-fix", {
       state: {
         issues: allIssues,
         websiteUrl: currentUrl,
@@ -279,7 +284,7 @@ export const useAnalysis = () => {
    * clearAnalysis();
    */
   const clearAnalysis = () => {
-    dispatch({ type: 'CLEAR_ALL' });
+    dispatch({ type: "CLEAR_ALL" });
     clearPersistedData();
   };
 
@@ -289,6 +294,8 @@ export const useAnalysis = () => {
     error,
     aiAnalysis,
     aiLoading,
+    aiError,
+    domScanError,
     scanStats,
     scannedElements,
     elementIssues,

@@ -4,7 +4,7 @@
  * Similar API to useState but with automatic localStorage synchronization
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * Custom hook for managing state with localStorage persistence
@@ -45,6 +45,23 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === key) {
+        try {
+          setStoredValue(e.newValue ? JSON.parse(e.newValue) : initialValue);
+        } catch (error) {
+          console.error(`Error parsing localStorage sync key "${key}":`, error);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [key, initialValue]);
+
   /**
    * Set value in state and localStorage
    * @param {T|Function} value - New value or function that receives previous value
@@ -63,3 +80,5 @@ export function useLocalStorage(key, initialValue) {
 
   return [storedValue, setValue];
 }
+
+export default useLocalStorage;

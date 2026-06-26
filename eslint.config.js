@@ -15,6 +15,9 @@ export default [
       ecmaVersion: 2020,
       globals: {
         ...globals.node,
+        window: 'readonly',
+        document: 'readonly',
+        Node: 'readonly',
       },
       parserOptions: {
         ecmaVersion: 'latest',

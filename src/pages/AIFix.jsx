@@ -1,12 +1,18 @@
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { getFixSuggestions } from '../services/aiFix';
-import { isAIAvailable } from '../config/aiConfig';
-import { STORAGE_KEYS } from '../constants';
-import jsPDF from 'jspdf';
-import IssueScreenshot from '../components/IssueScreenshot';
-import BeforeAfterComparison from '../components/BeforeAfterComparison';
-import logger from '../utils/logger';
+import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { getFixSuggestions } from "../services/aiFix";
+import { isAIAvailable } from "../config/aiConfig";
+import { STORAGE_KEYS } from "../constants";
+import jsPDF from "jspdf";
+import IssueScreenshot from "../components/IssueScreenshot";
+import BeforeAfterComparison from "../components/BeforeAfterComparison";
+import ErrorState from "../components/ErrorState";
+import logger from "../utils/logger";
+
+// Error codes the backend returns in { error: "<CODE>" } on non-200 responses.
+// These indicate a configuration problem that the user must fix before retrying.
+const PERMANENT_ERROR_CODES = ["AI_KEY_NOT_CONFIGURED", "INVALID_TOKEN"];
+const GITHUB_PERMANENT_CODES = ["INVALID_TOKEN", "REPO_NOT_FOUND"];
 
 function AIFix() {
   const location = useLocation();
@@ -23,10 +29,10 @@ function AIFix() {
       const savedAiFixes = localStorage.getItem(STORAGE_KEYS.AI_FIXES);
       const savedScanStats = localStorage.getItem(STORAGE_KEYS.SCAN_STATS);
       const savedScannedElements = localStorage.getItem(
-        STORAGE_KEYS.SCANNED_ELEMENTS
+        STORAGE_KEYS.SCANNED_ELEMENTS,
       );
       const savedElementIssues = localStorage.getItem(
-        STORAGE_KEYS.ELEMENT_ISSUES
+        STORAGE_KEYS.ELEMENT_ISSUES,
       );
       const savedWebsiteUrl = localStorage.getItem(STORAGE_KEYS.WEBSITE_URL);
 
@@ -49,7 +55,7 @@ function AIFix() {
 
       return {
         issues: allIssues,
-        websiteUrl: savedWebsiteUrl || '',
+        websiteUrl: savedWebsiteUrl || "",
         scanStats: savedScanStats
           ? JSON.parse(savedScanStats)
           : { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
@@ -59,10 +65,10 @@ function AIFix() {
         cachedAiFixes: savedAiFixes ? JSON.parse(savedAiFixes) : null,
       };
     } catch (error) {
-      console.error('Error loading data from localStorage:', error);
+      console.error("Error loading data from localStorage:", error);
       return {
         issues: [],
-        websiteUrl: '',
+        websiteUrl: "",
         scanStats: { pagesScanned: 0, totalPages: 0, scannedUrls: [] },
         scannedElements: [],
         cachedAiFixes: null,
@@ -75,18 +81,25 @@ function AIFix() {
 
   const hasAIAvailable = isAIAvailable();
 
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [fixSuggestions, setFixSuggestions] = useState({});
   const [loadingStates, setLoadingStates] = useState({});
+  // Call 5: error message + whether it is a permanent or transient failure.
   const [error, setError] = useState(null);
+  const [errorType, setErrorType] = useState(null); // 'permanent' | 'transient' | null
+  // Call 5: tracks whether the user has ever triggered a regenerate so we can
+  // distinguish "not yet generated" from "generated but got no results".
+  const [hasAttemptedRegenerate, setHasAttemptedRegenerate] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [githubDetails, setGithubDetails] = useState({
-    token: '',
-    owner: '',
-    repo: '',
+    token: "",
+    owner: "",
+    repo: "",
   });
   const [currentSuggestion, setCurrentSuggestion] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
+  // Call 6: separate error state kept inside the GitHub modal so it stays open.
+  const [modalError, setModalError] = useState(null);
   const [screenshotStates, setScreenshotStates] = useState({});
   const [comparisonStates, setComparisonStates] = useState({});
 
@@ -98,35 +111,58 @@ function AIFix() {
 
     // Use cached AI fixes if available
     if (cachedAiFixes) {
-      logger.success('Using cached AI fixes', {
+      logger.success("Using cached AI fixes", {
         issueCount: Object.keys(cachedAiFixes).length,
       });
       setFixSuggestions(cachedAiFixes);
-      setSuccessMessage('Using cached AI analysis results');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage("Using cached AI analysis results");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } else {
-      logger.debug('No cached AI fixes available');
+      logger.debug("No cached AI fixes available");
     }
   }, [hasAIAvailable, cachedAiFixes]);
 
-  // Manual regenerate function
+  // Call 5 — manual regenerate with permanent/transient error classification.
   const handleRegenerateFixes = async () => {
     if (!hasAIAvailable) {
-      setError('AI is not configured. Please check your AI settings.');
+      setError(
+        "AI is not configured. Add your API key in settings to enable fix generation.",
+      );
+      setErrorType("permanent");
       return;
     }
 
     try {
       setError(null);
+      setErrorType(null);
       setLoadingStates((prev) => ({ ...prev, suggestions: true }));
-      logger.info('Regenerating AI fixes', { issueCount: issues.length });
+      logger.info("Regenerating AI fixes", { issueCount: issues.length });
+
       const suggestions = await getFixSuggestions(issues);
       setFixSuggestions(suggestions);
-      setSuccessMessage('Generated fresh AI recommendations');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setHasAttemptedRegenerate(true);
+      setSuccessMessage("Generated fresh AI recommendations");
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      logger.error('Failed to regenerate AI fixes', err);
-      setError(err.message);
+      logger.error("Failed to regenerate AI fixes", err);
+
+      if (PERMANENT_ERROR_CODES.includes(err.code)) {
+        // Permanent: configuration error, no point retrying until user acts.
+        setError(
+          err.code === "AI_KEY_NOT_CONFIGURED"
+            ? "AI provider is not configured. Add your API key in settings to enable fix generation."
+            : "Invalid credentials. Update your API key in settings.",
+        );
+        setErrorType("permanent");
+      } else if (!err.status) {
+        // No HTTP status → fetch itself failed (offline / DNS / CORS).
+        setError("Couldn't reach the server — check your connection.");
+        setErrorType("transient");
+      } else {
+        // 500, 503, or any other server-side failure → worth retrying.
+        setError("The server encountered an error. Please try again.");
+        setErrorType("transient");
+      }
     } finally {
       setLoadingStates((prev) => ({ ...prev, suggestions: false }));
     }
@@ -155,16 +191,16 @@ function AIFix() {
 
   const getTypeColor = (type) => {
     switch (type) {
-      case 'performance':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'accessibility':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'best-practices':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'seo':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case "performance":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "accessibility":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "best-practices":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "seo":
+        return "bg-orange-100 text-orange-800 border-orange-200";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
@@ -174,7 +210,7 @@ function AIFix() {
 
     // Add title
     doc.setFontSize(16);
-    doc.text('Website Analysis Report', 20, yPos);
+    doc.text("Website Analysis Report", 20, yPos);
     yPos += 20;
 
     // Add scan statistics
@@ -188,7 +224,7 @@ function AIFix() {
 
     // Add issues and fixes
     doc.setFontSize(14);
-    doc.text('Issues and AI Fixes:', 20, yPos);
+    doc.text("Issues and AI Fixes:", 20, yPos);
     yPos += 10;
 
     issues.forEach((issue, index) => {
@@ -200,18 +236,18 @@ function AIFix() {
       doc.setFontSize(12);
       // Use title or description if available, fallback to a default message
       const issueTitle =
-        issue.title || issue.description || 'Issue details not available';
+        issue.title || issue.description || "Issue details not available";
       doc.text(`${index + 1}. Issue: ${issueTitle}`, 20, yPos);
       yPos += 10;
 
       // Add issue type and impact if available
       if (issue.type || issue.impact) {
         doc.setFontSize(10);
-        const typeText = issue.type ? `Type: ${issue.type}` : '';
+        const typeText = issue.type ? `Type: ${issue.type}` : "";
         const impactText = issue.impact
           ? `Impact: ${Math.round(issue.impact)}%`
-          : '';
-        const infoText = [typeText, impactText].filter(Boolean).join(' | ');
+          : "";
+        const infoText = [typeText, impactText].filter(Boolean).join(" | ");
         if (infoText) {
           doc.text(infoText, 30, yPos);
           yPos += 10;
@@ -223,11 +259,11 @@ function AIFix() {
         const suggestion = fixSuggestions[issue.title];
         doc.setFontSize(10);
         const suggestionText =
-          typeof suggestion === 'string'
+          typeof suggestion === "string"
             ? suggestion
             : Array.isArray(suggestion)
-            ? suggestion[0]?.description || 'Fix suggestion available'
-            : suggestion.description || 'Fix suggestion available';
+              ? suggestion[0]?.description || "Fix suggestion available"
+              : suggestion.description || "Fix suggestion available";
         doc.text(`AI Fix Suggestion: ${suggestionText}`, 30, yPos);
         yPos += 10;
       }
@@ -237,26 +273,30 @@ function AIFix() {
     });
 
     // Save the PDF
-    doc.save('website-analysis-report.pdf');
+    doc.save("website-analysis-report.pdf");
   };
 
   const handleApplyFix = (suggestion) => {
     setCurrentSuggestion(suggestion);
+    setModalError(null);
     setShowModal(true);
   };
 
+  // Call 6 — submit GitHub fix. Reads response body on non-200, surfaces
+  // data.success === false, and keeps the modal open on any error.
   const handleSubmitGithubDetails = async () => {
     if (!currentSuggestion) {
-      setError('No suggestion selected');
+      setModalError("No suggestion selected");
       return;
     }
 
     try {
+      setModalError(null);
       setLoadingStates((prev) => ({ ...prev, submitting: true }));
 
       // Find the current issue and get all its suggestions
       const currentIssue = issues.find((issue) =>
-        fixSuggestions[issue.title]?.includes(currentSuggestion)
+        fixSuggestions[issue.title]?.includes(currentSuggestion),
       );
       const allSuggestionsForIssue = currentIssue
         ? fixSuggestions[currentIssue.title]
@@ -265,12 +305,12 @@ function AIFix() {
       // Get all descriptions from the suggestions and join them with commas
       const suggestionsString = allSuggestionsForIssue
         .map((sug) => sug.description)
-        .join(', ');
+        .join(", ");
 
-      const response = await fetch('/api/repo/ai-optimize-specific', {
-        method: 'POST',
+      const response = await fetch("/api/repo/ai-optimize-specific", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           githubToken: githubDetails.token,
@@ -280,27 +320,53 @@ function AIFix() {
         }),
       });
 
+      // Always parse the body — we need it for both success data and error messages.
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Server returned an unreadable response.");
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to apply fix');
-      }
-
-      const data = await response.json();
-      setSuccessMessage('Fix applied successfully!');
-
-      // Open URLs in new tabs if available
-      if (data.success && data.data.pullRequest) {
-        const { url } = data.data.pullRequest;
-
-        // Open PR URL
-        if (url) {
-          window.open(url, '_blank').focus();
+        const code = data?.error;
+        if (GITHUB_PERMANENT_CODES.includes(code)) {
+          throw new Error(
+            code === "INVALID_TOKEN"
+              ? "GitHub token is invalid or expired. Update your token and try again."
+              : `Repository not found. Check that "${githubDetails.owner}/${githubDetails.repo}" exists and your token has access.`,
+          );
         }
+        // Surface the actual backend message instead of the generic fallback.
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            `Request failed (${response.status}).`,
+        );
       }
 
+      // Call 6 — handle logical failure: response was 200 but success is false.
+      if (!data.success) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "The fix could not be applied. Check your repository settings and try again.",
+        );
+      }
+
+      setSuccessMessage("Fix applied successfully!");
+
+      // Open PR URL in a new tab if available
+      if (data.data?.pullRequest?.url) {
+        window.open(data.data.pullRequest.url, "_blank").focus();
+      }
+
+      // Only close modal on genuine success
       setShowModal(false);
       setCurrentSuggestion(null);
     } catch (err) {
-      setError(err.message);
+      // Keep modal open and show error inside it — do not call setShowModal(false).
+      setModalError(err.message);
     } finally {
       setLoadingStates((prev) => ({ ...prev, submitting: false }));
     }
@@ -321,70 +387,70 @@ function AIFix() {
   };
 
   return (
-    <div className='min-h-screen bg-gray-100 p-8'>
-      <div className='max-w-6xl mx-auto'>
+    <div className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header with back button */}
-        <div className='flex items-center justify-between mb-6'>
-          <div className='flex items-center gap-4'>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/analyzer')}
-              className='p-2 rounded-lg'
+              onClick={() => navigate("/analyzer")}
+              className="p-2 rounded-lg"
             >
               <svg
-                className='w-6 h-6 text-white'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
                 <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   strokeWidth={2}
-                  d='M10 19l-7-7m0 0l7-7m-7 7h18'
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
                 />
               </svg>
             </button>
             <div>
-              <h1 className='text-2xl font-bold text-gray-800 text-left'>
-                {hasAIAvailable ? 'AI-Powered Fixes' : 'Issue Analysis'}
+              <h1 className="text-2xl font-bold text-gray-800 text-left">
+                {hasAIAvailable ? "AI-Powered Fixes" : "Issue Analysis"}
               </h1>
-              <p className='text-gray-600 text-left'>
+              <p className="text-gray-600 text-left">
                 {hasAIAvailable
-                  ? `AI analysis and fixes for ${websiteUrl || 'website'}`
-                  : `Manual review required for ${websiteUrl || 'website'}`}
+                  ? `AI analysis and fixes for ${websiteUrl || "website"}`
+                  : `Manual review required for ${websiteUrl || "website"}`}
               </p>
               {cachedAiFixes && (
-                <p className='text-sm text-green-600 mt-1'>
+                <p className="text-sm text-green-600 mt-1">
                   ✅ Using cached analysis results
                 </p>
               )}
             </div>
           </div>
 
-          <div className='flex gap-4'>
+          <div className="flex gap-4">
             {hasAIAvailable && (
               <button
                 onClick={handleRegenerateFixes}
                 disabled={loadingStates.suggestions}
-                className='bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2'
+                className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loadingStates.suggestions ? (
                   <>
-                    <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white'></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     Generating...
                   </>
                 ) : (
                   <>
                     <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      className='h-5 w-5'
-                      viewBox='0 0 20 20'
-                      fill='currentColor'
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
                     >
                       <path
-                        fillRule='evenodd'
-                        d='M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z'
-                        clipRule='evenodd'
+                        fillRule="evenodd"
+                        d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                        clipRule="evenodd"
                       />
                     </svg>
                     Regenerate Fixes
@@ -394,18 +460,18 @@ function AIFix() {
             )}
             <button
               onClick={generatePDF}
-              className='bg-black text-white px-4 py-2 rounded-sm hover:bg-gray-800 flex items-center gap-2'
+              className="bg-black text-white px-4 py-2 rounded-sm hover:bg-gray-800 flex items-center gap-2"
             >
               <svg
-                xmlns='http://www.w3.org/2000/svg'
-                className='h-5 w-5'
-                viewBox='0 0 20 20'
-                fill='currentColor'
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
               >
                 <path
-                  fillRule='evenodd'
-                  d='M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z'
-                  clipRule='evenodd'
+                  fillRule="evenodd"
+                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                  clipRule="evenodd"
                 />
               </svg>
               Download Report
@@ -415,18 +481,18 @@ function AIFix() {
 
         {/* GitHub Details Modal */}
         {showModal && (
-          <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center'>
-            <div className='bg-white p-6 rounded-lg w-96'>
-              <h2 className='text-xl font-bold mb-4'>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg w-96">
+              <h2 className="text-xl font-bold mb-4">
                 GitHub Repository Details
               </h2>
-              <div className='space-y-4'>
+              <div className="space-y-4">
                 <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     GitHub Token
                   </label>
                   <input
-                    type='password'
+                    type="password"
                     value={githubDetails.token}
                     onChange={(e) =>
                       setGithubDetails({
@@ -434,16 +500,16 @@ function AIFix() {
                         token: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded-sm'
-                    placeholder='Enter GitHub token'
+                    className="w-full p-2 border rounded-sm"
+                    placeholder="Enter GitHub token"
                   />
                 </div>
                 <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Repository Owner
                   </label>
                   <input
-                    type='text'
+                    type="text"
                     value={githubDetails.owner}
                     onChange={(e) =>
                       setGithubDetails({
@@ -451,16 +517,16 @@ function AIFix() {
                         owner: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded-sm'
-                    placeholder='Enter repository owner'
+                    className="w-full p-2 border rounded-sm"
+                    placeholder="Enter repository owner"
                   />
                 </div>
                 <div>
-                  <label className='block text-sm font-medium text-gray-700 mb-1'>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Repository Name
                   </label>
                   <input
-                    type='text'
+                    type="text"
                     value={githubDetails.repo}
                     onChange={(e) =>
                       setGithubDetails({
@@ -468,29 +534,40 @@ function AIFix() {
                         repo: e.target.value,
                       })
                     }
-                    className='w-full p-2 border rounded-sm'
-                    placeholder='Enter repository name'
+                    className="w-full p-2 border rounded-sm"
+                    placeholder="Enter repository name"
                   />
                 </div>
-                <div className='flex justify-end gap-4 mt-6'>
+
+                {/* Call 6 — modal-scoped error: keeps modal open, shows inline */}
+                {modalError && (
+                  <div className="pt-1">
+                    <ErrorState message={modalError} />
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-4 mt-6">
                   <button
-                    onClick={() => setShowModal(false)}
-                    className='px-4 py-2 text-gray-600 hover:text-gray-800'
+                    onClick={() => {
+                      setShowModal(false);
+                      setModalError(null);
+                    }}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSubmitGithubDetails}
-                    className='px-4 py-2 bg-green-600 text-white rounded-sm hover:bg-green-700 flex items-center gap-2'
+                    className="px-4 py-2 bg-green-600 text-white rounded-sm hover:bg-green-700 flex items-center gap-2"
                     disabled={loadingStates.submitting}
                   >
                     {loadingStates.submitting ? (
                       <>
-                        <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white'></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         Applying Fix...
                       </>
                     ) : (
-                      'Submit'
+                      "Submit"
                     )}
                   </button>
                 </div>
@@ -499,83 +576,107 @@ function AIFix() {
           </div>
         )}
 
+        {/* Call 5 — page-level error with retry or settings link based on error type */}
         {error && (
-          <div className='mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-sm'>
-            <p className='text-red-700'>{error}</p>
+          <div className="mb-6">
+            <ErrorState
+              message={error}
+              onRetry={
+                errorType === "transient" ? handleRegenerateFixes : undefined
+              }
+              settingsLink={
+                errorType === "permanent" ? "/github-config" : undefined
+              }
+            />
           </div>
         )}
 
         {successMessage && (
-          <div className='mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-sm'>
-            <p className='text-green-700'>{successMessage}</p>
+          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-sm">
+            <p className="text-green-700">{successMessage}</p>
           </div>
         )}
 
         {loadingStates.suggestions && (
-          <div className='mb-6 bg-blue-50 p-4 rounded-lg flex items-center gap-3'>
-            <div className='animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600'></div>
-            <p className='text-blue-600'>
+          <div className="mb-6 bg-blue-50 p-4 rounded-lg flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <p className="text-blue-600">
               Analyzing issues and generating fix suggestions...
             </p>
           </div>
         )}
 
+        {/* Call 5 — empty result: distinguish "not yet tried" from "tried and got nothing" */}
         {hasAIAvailable &&
-          !cachedAiFixes &&
+          !error &&
           !loadingStates.suggestions &&
           Object.keys(fixSuggestions).length === 0 && (
-            <div className='mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-sm'>
-              <div className='flex items-center gap-3'>
+            <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-sm">
+              <div className="flex items-center gap-3">
                 <svg
-                  className='w-5 h-5 text-yellow-600'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
+                  className="w-5 h-5 text-yellow-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
                   <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     strokeWidth={2}
-                    d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
                 <div>
-                  <p className='text-yellow-700 font-medium'>
-                    No AI fixes available yet
-                  </p>
-                  <p className='text-yellow-600 text-sm'>
-                    Click "Regenerate Fixes" to generate AI-powered suggestions
-                    for these issues.
-                  </p>
+                  {hasAttemptedRegenerate ? (
+                    <>
+                      <p className="text-yellow-700 font-medium">
+                        No fix suggestions found
+                      </p>
+                      <p className="text-yellow-600 text-sm">
+                        AI analysis ran successfully but returned no suggestions
+                        for these issues.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-yellow-700 font-medium">
+                        No AI fixes available yet
+                      </p>
+                      <p className="text-yellow-600 text-sm">
+                        Click "Regenerate Fixes" to generate AI-powered
+                        suggestions for these issues.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-        <div className='grid grid-cols-12 gap-6'>
+        <div className="grid grid-cols-12 gap-6">
           {/* Sidebar */}
-          <div className='col-span-12 lg:col-span-3 space-y-6'>
+          <div className="col-span-12 lg:col-span-3 space-y-6">
             {/* Scan Stats */}
-            <div className='bg-white rounded-xl shadow-lg p-6'>
-              <h2 className='text-lg font-semibold text-gray-800 mb-4'>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
                 Scan Statistics
               </h2>
-              <div className='space-y-3'>
+              <div className="space-y-3">
                 <div>
-                  <span className='text-gray-600'>Pages Scanned:</span>
-                  <span className='text-black font-medium ml-2'>
+                  <span className="text-gray-600">Pages Scanned:</span>
+                  <span className="text-black font-medium ml-2">
                     {scanStats?.pagesScanned || 0}
                   </span>
                 </div>
                 <div>
-                  <span className='text-gray-600'>Elements with Issues:</span>
-                  <span className='text-black font-medium ml-2'>
+                  <span className="text-gray-600">Elements with Issues:</span>
+                  <span className="text-black font-medium ml-2">
                     {Object.keys(groupedIssues).length}
                   </span>
                 </div>
                 <div>
-                  <span className='text-gray-600'>Total Issues:</span>
-                  <span className='text-black font-medium ml-2'>
+                  <span className="text-gray-600">Total Issues:</span>
+                  <span className="text-black font-medium ml-2">
                     {issues.length}
                   </span>
                 </div>
@@ -583,29 +684,29 @@ function AIFix() {
             </div>
 
             {/* Category Filter */}
-            <div className='bg-white rounded-xl shadow-lg p-6'>
-              <h2 className='text-lg font-semibold text-gray-800 mb-4'>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
                 Filter by Category
               </h2>
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <button
-                  onClick={() => setSelectedCategory('all')}
+                  onClick={() => setSelectedCategory("all")}
                   className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-hidden ${
-                    selectedCategory === 'all'
-                      ? 'bg-gray-800 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    selectedCategory === "all"
+                      ? "bg-gray-800 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
                   All Categories
                 </button>
-                {['performance', 'accessibility', 'seo'].map((type) => (
+                {["performance", "accessibility", "seo"].map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedCategory(type)}
                     className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left focus:outline-hidden ${
                       selectedCategory === type
-                        ? 'bg-gray-800 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? "bg-gray-800 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
                     {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -615,16 +716,16 @@ function AIFix() {
             </div>
 
             {/* Stats Summary */}
-            <div className='bg-white rounded-xl shadow-lg p-6'>
-              <h2 className='text-lg font-semibold text-gray-800 mb-4'>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
                 Issue Summary
               </h2>
-              <div className='space-y-3'>
-                {['performance', 'accessibility', 'seo', 'best-practices'].map(
+              <div className="space-y-3">
+                {["performance", "accessibility", "seo", "best-practices"].map(
                   (category) => {
                     const uniqueIssues = getUniqueIssues(issues);
                     const count = uniqueIssues.filter(
-                      (issue) => issue.type === category
+                      (issue) => issue.type === category,
                     ).length;
 
                     return (
@@ -632,69 +733,69 @@ function AIFix() {
                         key={category}
                         className={`p-3 rounded-lg ${getTypeColor(category)}`}
                       >
-                        <div className='text-lg font-bold'>{count}</div>
-                        <div className='text-sm'>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}{' '}
+                        <div className="text-lg font-bold">{count}</div>
+                        <div className="text-sm">
+                          {category.charAt(0).toUpperCase() + category.slice(1)}{" "}
                           Issues
                         </div>
                       </div>
                     );
-                  }
+                  },
                 )}
               </div>
             </div>
           </div>
 
           {/* Main Content Area */}
-          <div className='col-span-12 lg:col-span-9 space-y-6'>
+          <div className="col-span-12 lg:col-span-9 space-y-6">
             {/* Original Issues Section */}
-            <div className='bg-white rounded-xl shadow-lg p-6'>
-              <h2 className='text-xl font-bold text-gray-800 mb-6'>
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-6">
                 DOM Elements with Issues
               </h2>
 
               {/* Elements List */}
-              <div className='space-y-6'>
+              <div className="space-y-6">
                 {/* Meta Description Section */}
                 {scannedElements.filter(
                   (element) =>
-                    element.tag === 'meta' &&
+                    element.tag === "meta" &&
                     element.attributes.find(
                       (attr) =>
-                        attr.name === 'name' && attr.value === 'description'
-                    )
+                        attr.name === "name" && attr.value === "description",
+                    ),
                 ).length === 0 && (
-                  <div className='border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow'>
+                  <div className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
                     {/* Element Header */}
-                    <div className='mb-4'>
-                      <div className='flex items-center justify-between mb-2'>
-                        <h3 className='text-lg font-semibold text-gray-800'>
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-semibold text-gray-800">
                           Missing Meta Description
                         </h3>
-                        <div className='flex gap-2'>
-                          <span className='px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 border-orange-200'>
+                        <div className="flex gap-2">
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 border-orange-200">
                             SEO
                           </span>
                         </div>
                       </div>
-                      <p className='text-gray-600 text-sm'>
+                      <p className="text-gray-600 text-sm">
                         Your page is missing a meta description tag which is
                         important for SEO.
                       </p>
                     </div>
 
                     {/* Meta Description Fix */}
-                    <div className='bg-gray-50 p-4 rounded-lg'>
-                      <h4 className='font-medium text-gray-800 mb-2'>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-medium text-gray-800 mb-2">
                         Suggested Fix:
                       </h4>
-                      <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm'>
+                      <code className="block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm">
                         {
                           '<meta name="description" content="Add your website description here">'
                         }
                       </code>
-                      <p className='mt-2 text-sm text-gray-600'>
-                        Add this tag inside your {'<head>'} section with a
+                      <p className="mt-2 text-sm text-gray-600">
+                        Add this tag inside your {"<head>"} section with a
                         descriptive content that summarizes your page.
                       </p>
                     </div>
@@ -704,21 +805,21 @@ function AIFix() {
                 {/* Missing Alt Attributes Section */}
                 {scannedElements.filter(
                   (element) =>
-                    element.tag === 'img' &&
-                    (!element.attributes.find((attr) => attr.name === 'alt') ||
+                    element.tag === "img" &&
+                    (!element.attributes.find((attr) => attr.name === "alt") ||
                       element.attributes.find(
-                        (attr) => attr.name === 'alt' && attr.value === ''
-                      ))
+                        (attr) => attr.name === "alt" && attr.value === "",
+                      )),
                 ).length > 0 && (
-                  <div className='border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow'>
+                  <div className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
                     {/* Element Header */}
-                    <div className='mb-4'>
-                      <div className='flex items-center justify-between mb-2'>
-                        <h3 className='text-lg font-semibold text-gray-800'>
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-semibold text-gray-800">
                           Images Missing Alt Attributes
                         </h3>
-                        <div className='flex gap-2'>
-                          <span className='px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border-green-200'>
+                        <div className="flex gap-2">
+                          <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border-green-200">
                             Accessibility
                           </span>
                         </div>
@@ -726,31 +827,31 @@ function AIFix() {
                     </div>
 
                     {/* Images List */}
-                    <div className='space-y-4'>
+                    <div className="space-y-4">
                       {scannedElements
                         .filter(
                           (element) =>
-                            element.tag === 'img' &&
+                            element.tag === "img" &&
                             (!element.attributes.find(
-                              (attr) => attr.name === 'alt'
+                              (attr) => attr.name === "alt",
                             ) ||
                               element.attributes.find(
                                 (attr) =>
-                                  attr.name === 'alt' && attr.value === ''
-                              ))
+                                  attr.name === "alt" && attr.value === "",
+                              )),
                         )
                         .map((element, index) => (
                           <div
                             key={index}
-                            className='border-t border-gray-100 pt-4'
+                            className="border-t border-gray-100 pt-4"
                           >
-                            <code className='block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm'>
+                            <code className="block text-black text-sm font-mono bg-gray-100 p-3 rounded-sm">
                               {`<img ${element.attributes
                                 .map((attr) => `${attr.name}="${attr.value}"`)
-                                .join(' ')}>`}
+                                .join(" ")}>`}
                             </code>
-                            <div className='mt-2 text-sm text-gray-600'>
-                              Found at: {element.location || 'Unknown location'}
+                            <div className="mt-2 text-sm text-gray-600">
+                              Found at: {element.location || "Unknown location"}
                             </div>
                           </div>
                         ))}
@@ -760,42 +861,42 @@ function AIFix() {
 
                 {/* All Issues with AI Fixes */}
                 {hasAIAvailable && Object.keys(fixSuggestions).length > 0 && (
-                  <div className='bg-white rounded-lg shadow-xs border border-gray-200 p-6 mb-6'>
-                    <h2 className='text-xl font-semibold text-gray-800 mb-4'>
+                  <div className="bg-white rounded-lg shadow-xs border border-gray-200 p-6 mb-6">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">
                       🤖 AI-Generated Fixes
                     </h2>
-                    <div className='space-y-6'>
+                    <div className="space-y-6">
                       {Object.entries(fixSuggestions).map(
                         ([issueTitle, suggestions]) => (
                           <div
                             key={issueTitle}
-                            className='border-b border-gray-100 pb-6 last:border-b-0'
+                            className="border-b border-gray-100 pb-6 last:border-b-0"
                           >
-                            <h3 className='text-lg font-semibold text-gray-800 mb-2'>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2">
                               {issueTitle}
                             </h3>
 
                             {/* Find the original issue for context */}
                             {(() => {
                               const originalIssue = issues.find(
-                                (issue) => issue.title === issueTitle
+                                (issue) => issue.title === issueTitle,
                               );
                               return originalIssue ? (
-                                <div className='mb-4'>
-                                  <p className='text-gray-600 mb-2'>
+                                <div className="mb-4">
+                                  <p className="text-gray-600 mb-2">
                                     {originalIssue.description}
                                   </p>
                                   {originalIssue.type && (
                                     <span
                                       className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                                        originalIssue.type === 'performance'
-                                          ? 'bg-blue-100 text-blue-800'
+                                        originalIssue.type === "performance"
+                                          ? "bg-blue-100 text-blue-800"
                                           : originalIssue.type ===
-                                            'accessibility'
-                                          ? 'bg-green-100 text-green-800'
-                                          : originalIssue.type === 'seo'
-                                          ? 'bg-purple-100 text-purple-800'
-                                          : 'bg-gray-100 text-gray-800'
+                                              "accessibility"
+                                            ? "bg-green-100 text-green-800"
+                                            : originalIssue.type === "seo"
+                                              ? "bg-purple-100 text-purple-800"
+                                              : "bg-gray-100 text-gray-800"
                                       }`}
                                     >
                                       {originalIssue.type}
@@ -805,19 +906,19 @@ function AIFix() {
                               ) : null;
                             })()}
 
-                            <div className='bg-gray-50 rounded-lg p-4 space-y-4'>
-                              <h4 className='font-medium text-gray-800 flex items-center gap-2'>
+                            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                              <h4 className="font-medium text-gray-800 flex items-center gap-2">
                                 <svg
-                                  className='w-5 h-5 text-blue-600'
-                                  fill='none'
-                                  stroke='currentColor'
-                                  viewBox='0 0 24 24'
+                                  className="w-5 h-5 text-blue-600"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
                                 >
                                   <path
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                     strokeWidth={2}
-                                    d='M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z'
+                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                                   />
                                 </svg>
                                 AI Recommendations ({suggestions.length})
@@ -833,22 +934,22 @@ function AIFix() {
                                 return (
                                   <div
                                     key={sugIndex}
-                                    className='bg-white rounded-lg p-4 border border-gray-200'
+                                    className="bg-white rounded-lg p-4 border border-gray-200"
                                   >
-                                    <div className='mb-3'>
-                                      <h5 className='font-medium text-gray-800 mb-2'>
+                                    <div className="mb-3">
+                                      <h5 className="font-medium text-gray-800 mb-2">
                                         {suggestion.description}
                                       </h5>
                                       {suggestion.implementation && (
-                                        <p className='text-sm text-gray-600 mb-2'>
-                                          <strong>Implementation:</strong>{' '}
+                                        <p className="text-sm text-gray-600 mb-2">
+                                          <strong>Implementation:</strong>{" "}
                                           {suggestion.implementation}
                                         </p>
                                       )}
                                     </div>
 
                                     {/* Action Buttons */}
-                                    <div className='flex flex-wrap gap-2 mb-4'>
+                                    <div className="flex flex-wrap gap-2 mb-4">
                                       <button
                                         onClick={() =>
                                           setScreenshotStates((prev) => ({
@@ -856,24 +957,24 @@ function AIFix() {
                                             [suggestionKey]: !showScreenshot,
                                           }))
                                         }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors'
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                       >
                                         <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
                                         >
                                           <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                                           />
                                         </svg>
                                         {showScreenshot
-                                          ? 'Hide Screenshot'
-                                          : 'Show Screenshot'}
+                                          ? "Hide Screenshot"
+                                          : "Show Screenshot"}
                                       </button>
 
                                       <button
@@ -883,43 +984,43 @@ function AIFix() {
                                             [suggestionKey]: !showComparison,
                                           }))
                                         }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors'
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
                                       >
                                         <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
                                         >
                                           <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d='M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
+                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                                           />
                                         </svg>
                                         {showComparison
-                                          ? 'Hide Comparison'
-                                          : 'Before/After'}
+                                          ? "Hide Comparison"
+                                          : "Before/After"}
                                       </button>
 
                                       <button
                                         onClick={() =>
                                           handleApplyFix(suggestion)
                                         }
-                                        className='inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors'
+                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
                                       >
                                         <svg
-                                          className='w-4 h-4'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
+                                          className="w-4 h-4"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
                                         >
                                           <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                                           />
                                         </svg>
                                         Apply Fix
@@ -928,11 +1029,11 @@ function AIFix() {
 
                                     {(suggestion.code ||
                                       suggestion.codeExample) && (
-                                      <div className='bg-gray-50 p-3 rounded-lg mb-3'>
-                                        <span className='block text-sm text-gray-600 mb-2 font-medium'>
+                                      <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                                        <span className="block text-sm text-gray-600 mb-2 font-medium">
                                           Code Example:
                                         </span>
-                                        <pre className='text-black text-sm bg-gray-100 p-3 rounded-sm overflow-x-auto'>
+                                        <pre className="text-black text-sm bg-gray-100 p-3 rounded-sm overflow-x-auto">
                                           <code>
                                             {suggestion.code ||
                                               suggestion.codeExample}
@@ -943,8 +1044,8 @@ function AIFix() {
 
                                     {(suggestion.impact ||
                                       suggestion.expectedImpact) && (
-                                      <div className='text-sm text-green-700 bg-green-50 p-2 rounded-sm mb-3'>
-                                        <strong>Expected Impact:</strong>{' '}
+                                      <div className="text-sm text-green-700 bg-green-50 p-2 rounded-sm mb-3">
+                                        <strong>Expected Impact:</strong>{" "}
                                         {suggestion.impact ||
                                           suggestion.expectedImpact}
                                       </div>
@@ -952,30 +1053,30 @@ function AIFix() {
 
                                     {/* Screenshot Section */}
                                     {showScreenshot && (
-                                      <div className='mt-4 pt-4 border-t border-gray-200'>
+                                      <div className="mt-4 pt-4 border-t border-gray-200">
                                         <IssueScreenshot
                                           issue={{
                                             title: issueTitle,
                                             type:
                                               issues.find(
-                                                (i) => i.title === issueTitle
-                                              )?.type || 'accessibility',
+                                                (i) => i.title === issueTitle,
+                                              )?.type || "accessibility",
                                             selector: issues.find(
-                                              (i) => i.title === issueTitle
+                                              (i) => i.title === issueTitle,
                                             )?.selector,
                                           }}
                                           websiteUrl={websiteUrl}
-                                          className='max-w-2xl mx-auto'
+                                          className="max-w-2xl mx-auto"
                                         />
                                       </div>
                                     )}
 
                                     {/* Before/After Comparison Section */}
                                     {showComparison && (
-                                      <div className='mt-4 pt-4 border-t border-gray-200'>
+                                      <div className="mt-4 pt-4 border-t border-gray-200">
                                         <BeforeAfterComparison
                                           title={`Fix: ${issueTitle}`}
-                                          className='max-w-2xl mx-auto'
+                                          className="max-w-2xl mx-auto"
                                         />
                                       </div>
                                     )}
@@ -984,7 +1085,7 @@ function AIFix() {
                               })}
                             </div>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -993,34 +1094,34 @@ function AIFix() {
                 {/* Original Elements with Issues */}
                 {Object.keys(groupedIssues)
                   .filter((selector) =>
-                    selectedCategory === 'all'
+                    selectedCategory === "all"
                       ? true
                       : groupedIssues[selector].some(
-                          (issue) => issue.type === selectedCategory
-                        )
+                          (issue) => issue.type === selectedCategory,
+                        ),
                   )
                   .map((selector, index) => {
                     const elementIssues = groupedIssues[selector].filter(
                       (issue) =>
-                        selectedCategory === 'all' ||
-                        issue.type === selectedCategory
+                        selectedCategory === "all" ||
+                        issue.type === selectedCategory,
                     );
 
                     return (
                       <div
                         key={index}
-                        className='border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow'
+                        className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
                       >
                         {/* Element Header */}
-                        <div className='mb-4'>
-                          <div className='flex items-center justify-between mb-2'>
-                            <code className='text-black bg-gray-100 px-3 py-1.5 rounded-lg text-sm font-mono whitespace-pre'>
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <code className="text-black bg-gray-100 px-3 py-1.5 rounded-lg text-sm font-mono whitespace-pre">
                               {(() => {
                                 const parts = selector
-                                  .split(' > ')
+                                  .split(" > ")
                                   .map((part) => {
                                     // Split by both . and # but keep the delimiters
-                                    const segments = part.split(/([.#\[])/);
+                                    const segments = part.split(/([.#[])/);
                                     const tag = segments[0];
 
                                     // Process segments to collect classes, ids, and other attributes
@@ -1036,20 +1137,20 @@ function AIFix() {
                                       const delimiter = segments[i];
                                       const value = segments[i + 1];
 
-                                      if (delimiter === '.') {
+                                      if (delimiter === ".") {
                                         classes.push(value);
-                                      } else if (delimiter === '#') {
+                                      } else if (delimiter === "#") {
                                         id = value;
-                                      } else if (delimiter === '[') {
+                                      } else if (delimiter === "[") {
                                         // Handle attribute selectors [attr="value"]
                                         const attrMatch = value.match(
-                                          /([^=\]]+)(?:="([^"]*)")?\]/
+                                          /([^=\]]+)(?:="([^"]*)")?\]/,
                                         );
                                         if (attrMatch) {
                                           const [, attrName, attrValue] =
                                             attrMatch;
                                           otherAttributes[attrName] =
-                                            attrValue || '';
+                                            attrValue || "";
                                         }
                                       }
                                     }
@@ -1059,42 +1160,42 @@ function AIFix() {
                                       (issue) =>
                                         issue.element?.attributes?.some(
                                           (attr) =>
-                                            (attr.name === 'class' &&
+                                            (attr.name === "class" &&
                                               attr.value ===
-                                                classes.join(' ')) ||
-                                            (attr.name === 'id' &&
-                                              attr.value === id)
-                                        )
+                                                classes.join(" ")) ||
+                                            (attr.name === "id" &&
+                                              attr.value === id),
+                                        ),
                                     );
 
                                     if (elementIssue?.element?.attributes) {
                                       elementIssue.element.attributes.forEach(
                                         (attr) => {
                                           if (
-                                            attr.name !== 'class' &&
-                                            attr.name !== 'id'
+                                            attr.name !== "class" &&
+                                            attr.name !== "id"
                                           ) {
                                             otherAttributes[attr.name] =
                                               attr.value;
                                           }
-                                        }
+                                        },
                                       );
                                     }
 
                                     return {
                                       tag,
                                       classes: classes.length
-                                        ? classes.join(' ')
+                                        ? classes.join(" ")
                                         : null,
                                       id,
                                       attributes: otherAttributes,
                                     };
                                   });
 
-                                let output = '';
+                                let output = "";
                                 // Add opening tags with indentation
                                 parts.forEach((part, index) => {
-                                  const indent = ' '.repeat(index * 2);
+                                  const indent = " ".repeat(index * 2);
                                   const attrs = [];
 
                                   if (part.id) attrs.push(`id="${part.id}"`);
@@ -1105,19 +1206,19 @@ function AIFix() {
                                   Object.entries(part.attributes || {}).forEach(
                                     ([key, value]) => {
                                       attrs.push(`${key}="${value}"`);
-                                    }
+                                    },
                                   );
 
                                   const attributes = attrs.length
-                                    ? ' ' + attrs.join(' ')
-                                    : '';
+                                    ? " " + attrs.join(" ")
+                                    : "";
                                   output += `${indent}<${part.tag}${attributes}>\n`;
                                 });
 
                                 // Add closing tags with proper indentation
                                 [...parts].reverse().forEach((part, index) => {
-                                  const indent = ' '.repeat(
-                                    (parts.length - 1 - index) * 2
+                                  const indent = " ".repeat(
+                                    (parts.length - 1 - index) * 2,
                                   );
                                   output += `${indent}</${part.tag}>\n`;
                                 });
@@ -1125,16 +1226,16 @@ function AIFix() {
                                 return output.trim();
                               })()}
                             </code>
-                            <div className='flex gap-2'>
+                            <div className="flex gap-2">
                               {Array.from(
                                 new Set(
-                                  elementIssues.map((issue) => issue.type)
-                                )
+                                  elementIssues.map((issue) => issue.type),
+                                ),
                               ).map((type) => (
                                 <span
                                   key={type}
                                   className={`px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(
-                                    type
+                                    type,
                                   )}`}
                                 >
                                   {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -1145,7 +1246,7 @@ function AIFix() {
                         </div>
 
                         {/* Issues for this element */}
-                        <div className='space-y-4'>
+                        <div className="space-y-4">
                           {elementIssues.map((issue, issueIndex) => {
                             const suggestions =
                               fixSuggestions[issue.title] || [];
@@ -1153,37 +1254,37 @@ function AIFix() {
                             return (
                               <div
                                 key={issueIndex}
-                                className='border-t border-gray-100 pt-4'
+                                className="border-t border-gray-100 pt-4"
                               >
-                                <div className='flex items-center justify-between mb-2'>
-                                  <h3 className='text-lg font-semibold text-gray-800'>
+                                <div className="flex items-center justify-between mb-2">
+                                  <h3 className="text-lg font-semibold text-gray-800">
                                     {issue.title}
                                   </h3>
-                                  <div className='flex items-center gap-2'>
+                                  <div className="flex items-center gap-2">
                                     {issue.impact && (
-                                      <span className='bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium'>
+                                      <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                                         Impact: {Math.round(issue.impact)}%
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                                <p className='text-gray-600 mb-3'>
+                                <p className="text-gray-600 mb-3">
                                   {issue.description}
                                 </p>
 
                                 {/* Fix Suggestions */}
                                 {hasAIAvailable ? (
                                   suggestions.length > 0 ? (
-                                    <div className='bg-gray-50 rounded-lg p-4 space-y-3 mt-4'>
-                                      <div className='flex items-center justify-between'>
-                                        <h4 className='font-medium text-gray-800'>
+                                    <div className="bg-gray-50 rounded-lg p-4 space-y-3 mt-4">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="font-medium text-gray-800">
                                           AI Fix Suggestions:
                                         </h4>
                                         <button
                                           onClick={() =>
                                             handleApplyFix(suggestions[0])
                                           }
-                                          className='bg-green-600 text-white px-3 py-1 rounded-sm hover:bg-green-700 text-sm'
+                                          className="bg-green-600 text-white px-3 py-1 rounded-sm hover:bg-green-700 text-sm"
                                         >
                                           Apply Fix
                                         </button>
@@ -1192,56 +1293,56 @@ function AIFix() {
                                         (suggestion, sugIndex) => (
                                           <div
                                             key={sugIndex}
-                                            className='bg-white rounded-lg p-4 border border-gray-200'
+                                            className="bg-white rounded-lg p-4 border border-gray-200"
                                           >
-                                            <div className='flex items-center justify-between mb-3'>
-                                              <p className='text-gray-700 font-medium'>
+                                            <div className="flex items-center justify-between mb-3">
+                                              <p className="text-gray-700 font-medium">
                                                 {suggestion.description}
                                               </p>
                                             </div>
 
                                             {suggestion.code && (
-                                              <div className='bg-gray-50 p-3 rounded-lg mt-2'>
-                                                <span className='block text-sm text-gray-600 mb-1'>
+                                              <div className="bg-gray-50 p-3 rounded-lg mt-2">
+                                                <span className="block text-sm text-gray-600 mb-1">
                                                   Proposed Changes:
                                                 </span>
-                                                <pre className='text-black text-sm bg-gray-100 p-2 rounded-sm overflow-x-auto'>
+                                                <pre className="text-black text-sm bg-gray-100 p-2 rounded-sm overflow-x-auto">
                                                   <code>{suggestion.code}</code>
                                                 </pre>
                                               </div>
                                             )}
 
                                             {suggestion.impact && (
-                                              <div className='mt-2 text-sm text-gray-600'>
-                                                Expected Impact:{' '}
+                                              <div className="mt-2 text-sm text-gray-600">
+                                                Expected Impact:{" "}
                                                 {suggestion.impact}
                                               </div>
                                             )}
                                           </div>
-                                        )
+                                        ),
                                       )}
                                     </div>
                                   ) : (
-                                    <div className='bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4'>
-                                      <div className='flex items-center gap-3'>
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                                      <div className="flex items-center gap-3">
                                         <svg
-                                          className='w-5 h-5 text-blue-600'
-                                          fill='none'
-                                          stroke='currentColor'
-                                          viewBox='0 0 24 24'
+                                          className="w-5 h-5 text-blue-600"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
                                         >
                                           <path
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
                                             strokeWidth={2}
-                                            d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                           />
                                         </svg>
                                         <div>
-                                          <h4 className='font-medium text-blue-900'>
+                                          <h4 className="font-medium text-blue-900">
                                             AI Suggestions Loading...
                                           </h4>
-                                          <p className='text-sm text-blue-700'>
+                                          <p className="text-sm text-blue-700">
                                             Configure AI in development mode to
                                             get automated fix suggestions
                                           </p>
@@ -1250,26 +1351,26 @@ function AIFix() {
                                     </div>
                                   )
                                 ) : (
-                                  <div className='bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4'>
-                                    <div className='flex items-center gap-3'>
+                                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                                    <div className="flex items-center gap-3">
                                       <svg
-                                        className='w-5 h-5 text-gray-600'
-                                        fill='none'
-                                        stroke='currentColor'
-                                        viewBox='0 0 24 24'
+                                        className="w-5 h-5 text-gray-600"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
                                       >
                                         <path
-                                          strokeLinecap='round'
-                                          strokeLinejoin='round'
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
                                           strokeWidth={2}
-                                          d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                         />
                                       </svg>
                                       <div>
-                                        <h4 className='font-medium text-gray-900'>
+                                        <h4 className="font-medium text-gray-900">
                                           Manual Fix Required
                                         </h4>
-                                        <p className='text-sm text-gray-600'>
+                                        <p className="text-sm text-gray-600">
                                           AI suggestions not available. Please
                                           review the issue description and
                                           implement fixes manually.
@@ -1287,14 +1388,14 @@ function AIFix() {
                   })}
 
                 {Object.keys(groupedIssues).filter((selector) =>
-                  selectedCategory === 'all'
+                  selectedCategory === "all"
                     ? true
                     : groupedIssues[selector].some(
-                        (issue) => issue.type === selectedCategory
-                      )
+                        (issue) => issue.type === selectedCategory,
+                      ),
                 ).length === 0 && (
-                  <div className='text-center py-8'>
-                    <p className='text-gray-600'>
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">
                       No DOM elements found with issues in the selected
                       category.
                     </p>
@@ -1302,46 +1403,6 @@ function AIFix() {
                 )}
               </div>
             </div>
-
-            {/* Display scanned elements */}
-            {/* <div className='mt-8'>
-              <h2 className='text-2xl font-bold mb-4'>Scanned Elements</h2>
-              {isScanning ? (
-                <div className='text-gray-600'>
-                  Scanning website elements...
-                </div>
-              ) : scannedElements.length > 0 ? (
-                <div className='space-y-4'>
-                  {scannedElements.map((element, index) => (
-                    <div key={index} className='p-4 bg-white rounded-lg shadow-sm'>
-                      <div className='flex items-center space-x-2'>
-                        <span className='font-mono text-blue-600'>
-                          {element.tag}
-                        </span>
-                        {element.id && (
-                          <span className='text-gray-600'>#{element.id}</span>
-                        )}
-                        {element.classes.length > 0 && (
-                          <span className='text-green-600'>
-                            .{element.classes.join(".")}
-                          </span>
-                        )}
-                      </div>
-                      {element.textContent && (
-                        <div className='mt-2 text-gray-700 truncate'>
-                          {element.textContent}
-                        </div>
-                      )}
-                      <div className='mt-2 text-sm text-gray-500'>
-                        Path: {element.path}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className='text-gray-600'>No elements scanned yet.</div>
-              )}
-            </div> */}
           </div>
         </div>
       </div>
