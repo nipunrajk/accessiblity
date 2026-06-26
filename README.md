@@ -87,7 +87,7 @@ VITE_OPENROUTER_API_KEY=your_openrouter_key
 
 # Supabase (Optional - for authentication)
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
 ```
 
 #### Backend (`backend/.env`)
