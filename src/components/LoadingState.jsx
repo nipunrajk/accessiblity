@@ -1,10 +1,10 @@
 import { Zap } from "lucide-react";
 
-function LoadingState({ scanStats = {} }) {
-  const { pagesScanned = 0, totalPages = 0 } = scanStats;
+function LoadingState({ scanStats = {}, isAnalyzing = false }) {
+  const { pagesScanned = 0, totalPages = 0, message = "" } = scanStats;
 
-  // Full-page loading state (when no scan stats)
-  if (pagesScanned === 0 && totalPages === 0) {
+  // Full-page loading state (when no scan stats and not actively analyzing)
+  if (!isAnalyzing && pagesScanned === 0 && totalPages === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -41,7 +41,9 @@ function LoadingState({ scanStats = {} }) {
           Analyzing Website
         </h3>
         <p className="text-muted-foreground mb-4">
-          Scanning {pagesScanned} of {totalPages || "?"} pages
+          {message || (totalPages === 0 
+            ? "Initializing scan and discovering pages..." 
+            : `Scanning ${pagesScanned} of ${totalPages} pages`)}
         </p>
         <div className="w-full bg-muted rounded-full h-2">
           <div

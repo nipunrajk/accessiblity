@@ -153,7 +153,7 @@ class AnalysisAPI {
               }
 
               // Handle progress updates
-              if (onProgress && data.pagesScanned !== undefined) {
+              if (onProgress) {
                 onProgress(data);
               }
             } catch (parseError) {

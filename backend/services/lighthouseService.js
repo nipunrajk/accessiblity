@@ -24,7 +24,7 @@ class LighthouseService {
     };
   }
 
-  async discoverPages(url, maxPages = 100) {
+  async discoverPages(url, maxPages = 1) {
     const browser = await puppeteer.launch(this.browserConfig);
     const page = await browser.newPage();
 

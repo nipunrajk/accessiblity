@@ -68,7 +68,6 @@ export default function Analyzer() {
     clearAnalysis,
   } = useAnalysis();
 
-  const handleAnalyze = async () => {
   useEffect(() => {
     if (!websiteUrl) {
       Promise.resolve().then(() => {
@@ -119,6 +118,7 @@ export default function Analyzer() {
     fetchScreenshot();
   }, [websiteUrl, selectedDevice]);
 
+  const handleAnalyze = async () => {
     if (!url) return;
     await runAnalysis(url);
   };
@@ -211,7 +211,7 @@ export default function Analyzer() {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="container mx-auto px-4 py-8">
-          <LoadingState scanStats={scanStats} />
+          <LoadingState scanStats={scanStats} isAnalyzing={true} />
         </main>
       </div>
     );
