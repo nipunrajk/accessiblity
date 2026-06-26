@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Header } from "../components/Header";
 import { useAnalysis } from "../hooks/useAnalysis";
 import LoadingState from "../components/LoadingState";
+import { config } from "../config/index.js";
 import ErrorState from "../components/ErrorState";
 import ViolationsList from "../components/ViolationsList";
 import {
@@ -50,6 +51,9 @@ export default function Analyzer() {
   const [selectedDevice, setSelectedDevice] = useState("desktop");
   const [shareCopied, setShareCopied] = useState(false);
 
+  const [screenshotUrl, setScreenshotUrl] = useState(null);
+  const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [screenshotError, setScreenshotError] = useState(null);
   const {
     loading,
     results,
@@ -65,6 +69,56 @@ export default function Analyzer() {
   } = useAnalysis();
 
   const handleAnalyze = async () => {
+  useEffect(() => {
+    if (!websiteUrl) {
+      Promise.resolve().then(() => {
+        setScreenshotUrl(null);
+        setScreenshotError(null);
+      });
+      return;
+    }
+
+    const fetchScreenshot = async () => {
+      // Defer state updates to avoid synchronous setState during render/effect phase
+      await Promise.resolve();
+      setScreenshotLoading(true);
+      setScreenshotError(null);
+      try {
+        const response = await fetch(`${config.api.baseUrl}/api/screenshot/capture`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: websiteUrl,
+            options: {
+              width: selectedDevice === 'desktop' ? 1200 : 375,
+              height: selectedDevice === 'desktop' ? 800 : 667,
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.success) {
+          setScreenshotUrl(data.screenshot);
+        } else {
+          setScreenshotError(data.error || 'Failed to capture screenshot');
+        }
+      } catch (err) {
+        console.error('Error fetching screenshot:', err);
+        setScreenshotError('Failed to capture screenshot');
+      } finally {
+        setScreenshotLoading(false);
+      }
+    };
+
+    fetchScreenshot();
+  }, [websiteUrl, selectedDevice]);
+
     if (!url) return;
     await runAnalysis(url);
   };
@@ -836,8 +890,24 @@ export default function Analyzer() {
                   <div className="space-y-6">
                     {/* Main Screenshot */}
                     <div className="relative group">
-                      <div className="aspect-video rounded-lg border-2 bg-muted overflow-hidden">
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <div className="aspect-video rounded-lg border-2 bg-muted overflow-hidden flex items-center justify-center relative">
+                        {screenshotLoading ? (
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
+                            <p className="text-xs text-muted-foreground animate-pulse">Capturing screenshot...</p>
+                          </div>
+                        ) : screenshotError ? (
+                          <div className="text-center p-4">
+                            <AlertTriangle className="h-6 w-6 text-destructive mx-auto mb-2" />
+                            <p className="text-xs text-muted-foreground">{screenshotError}</p>
+                          </div>
+                        ) : screenshotUrl ? (
+                          <img
+                            src={screenshotUrl}
+                            alt={`${selectedDevice} screenshot`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
                           <div className="text-center">
                             <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
                             <p className="text-xs">Screenshot preview</p>
@@ -847,7 +917,7 @@ export default function Analyzer() {
                                 : "375×667"}
                             </p>
                           </div>
-                        </div>
+                        )}
                       </div>
                       <div className="absolute top-2 left-2">
                         <span className="px-2 py-1 text-[10px] bg-background/90 backdrop-blur border rounded">
