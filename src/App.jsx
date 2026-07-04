@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Suspense, lazy, useState, useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoadingState from "./components/LoadingState";
+import RadixThemeProvider from "./components/ThemeProvider";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AnalysisProvider } from "./contexts/AnalysisContext";
 import { useAuthStore } from "./stores/authStore";
@@ -47,56 +48,58 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AnalysisProvider>
-        <ErrorBoundary fallbackMessage="The application encountered an unexpected error. Please refresh the page to continue.">
-          <Suspense fallback={<LoadingState />}>
-            <Routes>
-              {/* Root redirects to the main analyzer */}
-              <Route path="/" element={<Navigate to="/analyzer" replace />} />
+    <RadixThemeProvider>
+      <ThemeProvider>
+        <AnalysisProvider>
+          <ErrorBoundary fallbackMessage="The application encountered an unexpected error. Please refresh the page to continue.">
+            <Suspense fallback={<LoadingState />}>
+              <Routes>
+                {/* Root redirects to the main analyzer */}
+                <Route path="/" element={<Navigate to="/analyzer" replace />} />
 
-              {/* Public routes */}
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/login" element={<Login />} />
+                {/* Public routes */}
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/login" element={<Login />} />
 
-              {/* Protected routes — require authentication */}
-              <Route
-                path="/analyzer"
-                element={
-                  <ProtectedRoute>
-                    <Analyzer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/analyze/:id"
-                element={
-                  <ProtectedRoute>
-                    <Analyzer />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ai-fix"
-                element={
-                  <ProtectedRoute>
-                    <AIFix />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/github-config"
-                element={
-                  <ProtectedRoute>
-                    <GitHubConfig />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </AnalysisProvider>
-    </ThemeProvider>
+                {/* Protected routes — require authentication */}
+                <Route
+                  path="/analyzer"
+                  element={
+                    <ProtectedRoute>
+                      <Analyzer />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/analyze/:id"
+                  element={
+                    <ProtectedRoute>
+                      <Analyzer />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/ai-fix"
+                  element={
+                    <ProtectedRoute>
+                      <AIFix />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/github-config"
+                  element={
+                    <ProtectedRoute>
+                      <GitHubConfig />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </AnalysisProvider>
+      </ThemeProvider>
+    </RadixThemeProvider>
   );
 }
 

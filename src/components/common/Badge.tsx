@@ -1,6 +1,7 @@
 import { HTMLAttributes, ReactNode, forwardRef } from 'react';
+import { Badge as RadixBadge } from '@radix-ui/themes';
 
-export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
+export interface BadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'color'> {
   children: ReactNode;
   variant?:
     | 'default'
@@ -23,34 +24,30 @@ const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
     { children, variant = 'default', size = 'md', className = '', ...props },
     ref
   ) => {
-    const baseClasses = 'inline-flex items-center font-medium rounded-full';
+    let radixColor: 'gray' | 'teal' | 'green' | 'yellow' | 'red' | 'blue' = 'gray';
+    let radixVariant: 'soft' | 'solid' | 'outline' = 'soft';
 
-    const variantClasses = {
-      default: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
-      primary: 'bg-black dark:bg-white text-white dark:text-black',
-      success:
-        'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
-      warning:
-        'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200',
-      danger: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
-      info: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
-      outline: 'border border-gray-200 bg-transparent text-gray-700',
-    };
+    if (variant === 'default') { radixColor = 'gray'; radixVariant = 'soft'; }
+    else if (variant === 'primary') { radixColor = 'teal'; radixVariant = 'solid'; }
+    else if (variant === 'success') { radixColor = 'green'; radixVariant = 'soft'; }
+    else if (variant === 'warning') { radixColor = 'yellow'; radixVariant = 'soft'; }
+    else if (variant === 'danger') { radixColor = 'red'; radixVariant = 'soft'; }
+    else if (variant === 'info') { radixColor = 'blue'; radixVariant = 'soft'; }
+    else if (variant === 'outline') { radixColor = 'gray'; radixVariant = 'outline'; }
 
-    const sizeClasses = {
-      sm: 'px-2 py-0.5 text-xs',
-      md: 'px-2.5 py-1 text-sm',
-      lg: 'px-3 py-1.5 text-base',
-    };
+    const radixSize = size === 'sm' ? '1' : size === 'lg' ? '3' : '2';
 
     return (
-      <span
-        className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      <RadixBadge
+        color={radixColor}
+        variant={radixVariant}
+        size={radixSize}
+        className={className}
         ref={ref}
         {...props}
       >
         {children}
-      </span>
+      </RadixBadge>
     );
   }
 );

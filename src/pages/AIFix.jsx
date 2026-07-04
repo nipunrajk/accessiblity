@@ -8,6 +8,8 @@ import IssueScreenshot from "../components/IssueScreenshot";
 import BeforeAfterComparison from "../components/BeforeAfterComparison";
 import ErrorState from "../components/ErrorState";
 import logger from "../utils/logger";
+import { Box, Flex, Heading, Text, Badge, Card, Button, Dialog, Callout, Spinner } from '@radix-ui/themes';
+import { CopyIcon } from '@radix-ui/react-icons';
 
 // Error codes the backend returns in { error: "<CODE>" } on non-200 responses.
 // These indicate a configuration problem that the user must fix before retrying.
@@ -387,17 +389,17 @@ function AIFix() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <Box p="6" style={{ backgroundColor: 'var(--gray-1)', minHeight: '100vh' }}>
       <div className="max-w-6xl mx-auto">
         {/* Header with back button */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <Flex justify="between" align="center" mb="4">
+          <Flex align="center" gap="4">
             <button
               onClick={() => navigate("/analyzer")}
               className="p-2 rounded-lg"
             >
               <svg
-                className="w-6 h-6 text-white"
+                className="w-6 h-6 text-gray-800"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -411,39 +413,41 @@ function AIFix() {
               </svg>
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-800 text-left">
-                {hasAIAvailable ? "AI-Powered Fixes" : "Issue Analysis"}
-              </h1>
-              <p className="text-gray-600 text-left">
+              <Heading size="6" weight="bold">AI Remediation</Heading>
+              <Text color="gray" as="p" size="2">
                 {hasAIAvailable
                   ? `AI analysis and fixes for ${websiteUrl || "website"}`
                   : `Manual review required for ${websiteUrl || "website"}`}
-              </p>
+              </Text>
               {cachedAiFixes && (
-                <p className="text-sm text-green-600 mt-1">
+                <Text size="1" color="jade" as="p" mt="1">
                   ✅ Using cached analysis results
-                </p>
+                </Text>
               )}
             </div>
-          </div>
+          </Flex>
 
-          <div className="flex gap-4">
+          <Flex gap="4" align="center">
+            <Badge color="teal" variant="surface">
+              {loadingStates.submitting ? "Applying" : successMessage ? "Applied" : "Pending Review"}
+            </Badge>
             {hasAIAvailable && (
-              <button
-                onClick={handleRegenerateFixes}
+              <Button
+                color="blue"
+                variant="solid"
                 disabled={loadingStates.suggestions}
-                className="bg-blue-600 text-white px-4 py-2 rounded-sm hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
+                onClick={handleRegenerateFixes}
               >
                 {loadingStates.suggestions ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <Spinner size="2" />
                     Generating...
                   </>
                 ) : (
                   <>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-5 w-5 mr-1"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                     >
@@ -456,129 +460,77 @@ function AIFix() {
                     Regenerate Fixes
                   </>
                 )}
-              </button>
+              </Button>
             )}
-            <button
-              onClick={generatePDF}
-              className="bg-black text-white px-4 py-2 rounded-sm hover:bg-gray-800 flex items-center gap-2"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
+            <Button color="gray" variant="solid" onClick={generatePDF}>
               Download Report
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Flex>
+        </Flex>
 
         {/* GitHub Details Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg w-96">
-              <h2 className="text-xl font-bold mb-4">
-                GitHub Repository Details
-              </h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    GitHub Token
-                  </label>
-                  <input
-                    type="password"
-                    value={githubDetails.token}
-                    onChange={(e) =>
-                      setGithubDetails({
-                        ...githubDetails,
-                        token: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-sm"
-                    placeholder="Enter GitHub token"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Repository Owner
-                  </label>
-                  <input
-                    type="text"
-                    value={githubDetails.owner}
-                    onChange={(e) =>
-                      setGithubDetails({
-                        ...githubDetails,
-                        owner: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-sm"
-                    placeholder="Enter repository owner"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Repository Name
-                  </label>
-                  <input
-                    type="text"
-                    value={githubDetails.repo}
-                    onChange={(e) =>
-                      setGithubDetails({
-                        ...githubDetails,
-                        repo: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded-sm"
-                    placeholder="Enter repository name"
-                  />
-                </div>
+        <Dialog.Root open={showModal} onOpenChange={(open) => {
+          setShowModal(open);
+          if (!open) setModalError(null);
+        }}>
+          <Dialog.Content maxWidth="450px">
+            <Dialog.Title>Confirm Pull Request</Dialog.Title>
+            <Dialog.Description size="2">
+              This will create a new branch and open a PR against {githubDetails.repo || "your repository"}. Are you sure?
+            </Dialog.Description>
+            <Flex direction="column" gap="3" mt="4">
+              <label>
+                <Text as="div" size="2" mb="1" weight="bold">GitHub Token</Text>
+                <input
+                  type="password"
+                  value={githubDetails.token}
+                  onChange={(e) => setGithubDetails({ ...githubDetails, token: e.target.value })}
+                  className="w-full p-2 border rounded-sm"
+                  placeholder="Enter GitHub token"
+                />
+              </label>
+              <label>
+                <Text as="div" size="2" mb="1" weight="bold">Repository Owner</Text>
+                <input
+                  type="text"
+                  value={githubDetails.owner}
+                  onChange={(e) => setGithubDetails({ ...githubDetails, owner: e.target.value })}
+                  className="w-full p-2 border rounded-sm"
+                  placeholder="Enter repository owner"
+                />
+              </label>
+              <label>
+                <Text as="div" size="2" mb="1" weight="bold">Repository Name</Text>
+                <input
+                  type="text"
+                  value={githubDetails.repo}
+                  onChange={(e) => setGithubDetails({ ...githubDetails, repo: e.target.value })}
+                  className="w-full p-2 border rounded-sm"
+                  placeholder="Enter repository name"
+                />
+              </label>
 
-                {/* Call 6 — modal-scoped error: keeps modal open, shows inline */}
-                {modalError && (
-                  <div className="pt-1">
-                    <ErrorState message={modalError} />
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-4 mt-6">
-                  <button
-                    onClick={() => {
-                      setShowModal(false);
-                      setModalError(null);
-                    }}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSubmitGithubDetails}
-                    className="px-4 py-2 bg-green-600 text-white rounded-sm hover:bg-green-700 flex items-center gap-2"
-                    disabled={loadingStates.submitting}
-                  >
-                    {loadingStates.submitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Applying Fix...
-                      </>
-                    ) : (
-                      "Submit"
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+              {modalError && (
+                <Callout.Root color="tomato" mt="2">
+                  <Callout.Text>{modalError}</Callout.Text>
+                </Callout.Root>
+              )}
+            </Flex>
+            <Flex gap="3" justify="end" mt="4">
+              <Dialog.Close>
+                <Button variant="surface" color="gray">Cancel</Button>
+              </Dialog.Close>
+              <Button color="teal" variant="solid" onClick={handleSubmitGithubDetails} disabled={loadingStates.submitting}>
+                {loadingStates.submitting && <Spinner size="2" />}
+                Create PR
+              </Button>
+            </Flex>
+          </Dialog.Content>
+        </Dialog.Root>
 
         {/* Call 5 — page-level error with retry or settings link based on error type */}
         {error && (
-          <div className="mb-6">
+          <Box mb="6">
             <ErrorState
               message={error}
               onRetry={
@@ -588,22 +540,26 @@ function AIFix() {
                 errorType === "permanent" ? "/github-config" : undefined
               }
             />
-          </div>
+          </Box>
         )}
 
         {successMessage && (
-          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-sm">
-            <p className="text-green-700">{successMessage}</p>
-          </div>
+          <Box mb="6">
+            <Callout.Root color="jade">
+              <Callout.Text>{successMessage}</Callout.Text>
+            </Callout.Root>
+          </Box>
         )}
 
         {loadingStates.suggestions && (
-          <div className="mb-6 bg-blue-50 p-4 rounded-lg flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-            <p className="text-blue-600">
-              Analyzing issues and generating fix suggestions...
-            </p>
-          </div>
+          <Box mb="6">
+            <Callout.Root color="blue">
+              <Flex gap="3" align="center">
+                <Spinner size="2" />
+                <Callout.Text>Analyzing issues and generating fix suggestions...</Callout.Text>
+              </Flex>
+            </Callout.Root>
+          </Box>
         )}
 
         {/* Call 5 — empty result: distinguish "not yet tried" from "tried and got nothing" */}
@@ -932,124 +888,78 @@ function AIFix() {
                                   comparisonStates[suggestionKey] || false;
 
                                 return (
-                                  <div
-                                    key={sugIndex}
-                                    className="bg-white rounded-lg p-4 border border-gray-200"
-                                  >
-                                    <div className="mb-3">
-                                      <h5 className="font-medium text-gray-800 mb-2">
+                                  <Card key={sugIndex} variant="surface" size="2" mb="4">
+                                    <Flex direction="column" gap="2">
+                                      <Heading size="3" weight="medium" color={originalIssue?.type === 'accessibility' ? 'tomato' : 'amber'}>
                                         {suggestion.description}
-                                      </h5>
+                                      </Heading>
                                       {suggestion.implementation && (
-                                        <p className="text-sm text-gray-600 mb-2">
-                                          <strong>Implementation:</strong>{" "}
+                                        <Text size="2" color="gray">
                                           {suggestion.implementation}
-                                        </p>
+                                        </Text>
                                       )}
-                                    </div>
 
-                                    {/* Action Buttons */}
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                      <button
-                                        onClick={() =>
-                                          setScreenshotStates((prev) => ({
-                                            ...prev,
-                                            [suggestionKey]: !showScreenshot,
-                                          }))
-                                        }
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
+                                      {/* Action Buttons */}
+                                      <Flex wrap="wrap" gap="2" mt="2">
+                                        <Button
+                                          variant="surface"
+                                          color="gray"
+                                          size="1"
+                                          onClick={() =>
+                                            setScreenshotStates((prev) => ({
+                                              ...prev,
+                                              [suggestionKey]: !showScreenshot,
+                                            }))
+                                          }
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                          />
-                                        </svg>
-                                        {showScreenshot
-                                          ? "Hide Screenshot"
-                                          : "Show Screenshot"}
-                                      </button>
+                                          {showScreenshot ? "Hide Screenshot" : "Show Screenshot"}
+                                        </Button>
 
-                                      <button
-                                        onClick={() =>
-                                          setComparisonStates((prev) => ({
-                                            ...prev,
-                                            [suggestionKey]: !showComparison,
-                                          }))
-                                        }
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
+                                        <Button
+                                          variant="surface"
+                                          color="blue"
+                                          size="1"
+                                          onClick={() =>
+                                            setComparisonStates((prev) => ({
+                                              ...prev,
+                                              [suggestionKey]: !showComparison,
+                                            }))
+                                          }
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                                          />
-                                        </svg>
-                                        {showComparison
-                                          ? "Hide Comparison"
-                                          : "Before/After"}
-                                      </button>
+                                          {showComparison ? "Hide Comparison" : "Before/After"}
+                                        </Button>
 
-                                      <button
-                                        onClick={() =>
-                                          handleApplyFix(suggestion)
-                                        }
-                                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
-                                      >
-                                        <svg
-                                          className="w-4 h-4"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          viewBox="0 0 24 24"
+                                        <Button
+                                          color="teal"
+                                          variant="solid"
+                                          size="1"
+                                          onClick={() => handleApplyFix(suggestion)}
+                                          disabled={loadingStates.submitting}
                                         >
-                                          <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                          />
-                                        </svg>
-                                        Apply Fix
-                                      </button>
-                                    </div>
+                                          {loadingStates.submitting && currentSuggestion === suggestion ? <Spinner size="2" /> : null}
+                                          Apply Fix to GitHub
+                                        </Button>
+                                      </Flex>
 
-                                    {(suggestion.code ||
-                                      suggestion.codeExample) && (
-                                      <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                                        <span className="block text-sm text-gray-600 mb-2 font-medium">
-                                          Code Example:
-                                        </span>
-                                        <pre className="text-black text-sm bg-gray-100 p-3 rounded-sm overflow-x-auto">
-                                          <code>
-                                            {suggestion.code ||
-                                              suggestion.codeExample}
-                                          </code>
-                                        </pre>
-                                      </div>
-                                    )}
+                                      {(suggestion.code || suggestion.codeExample) && (
+                                        <Box mt="2" position="relative">
+                                          <Text size="2" weight="bold" mb="1" as="div">Code Example:</Text>
+                                          <Box p="3" style={{ background: 'var(--gray-3)', borderRadius: 'var(--radius-2)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre-wrap' }}>
+                                            {suggestion.code || suggestion.codeExample}
+                                          </Box>
+                                          <Box position="absolute" top="6" right="2">
+                                            <Button variant="ghost" size="1" color="gray" onClick={() => navigator.clipboard.writeText(suggestion.code || suggestion.codeExample)}>
+                                              <CopyIcon />
+                                            </Button>
+                                          </Box>
+                                        </Box>
+                                      )}
 
-                                    {(suggestion.impact ||
-                                      suggestion.expectedImpact) && (
-                                      <div className="text-sm text-green-700 bg-green-50 p-2 rounded-sm mb-3">
-                                        <strong>Expected Impact:</strong>{" "}
-                                        {suggestion.impact ||
-                                          suggestion.expectedImpact}
-                                      </div>
-                                    )}
+                                      {(suggestion.impact || suggestion.expectedImpact) && (
+                                        <Text size="2" color="jade" mt="2">
+                                          <strong>Expected Impact:</strong> {suggestion.impact || suggestion.expectedImpact}
+                                        </Text>
+                                      )}
 
                                     {/* Screenshot Section */}
                                     {showScreenshot && (
@@ -1080,7 +990,8 @@ function AIFix() {
                                         />
                                       </div>
                                     )}
-                                  </div>
+                                    </Flex>
+                                  </Card>
                                 );
                               })}
                             </div>
@@ -1291,34 +1202,39 @@ function AIFix() {
                                       </div>
                                       {suggestions.map(
                                         (suggestion, sugIndex) => (
-                                          <div
-                                            key={sugIndex}
-                                            className="bg-white rounded-lg p-4 border border-gray-200"
-                                          >
-                                            <div className="flex items-center justify-between mb-3">
-                                              <p className="text-gray-700 font-medium">
+                                          <Card key={sugIndex} variant="surface" size="2" mb="3">
+                                            <Flex direction="column" gap="2">
+                                              <Heading size="3" weight="medium" color={issue.impact > 50 ? 'tomato' : 'amber'}>
                                                 {suggestion.description}
-                                              </p>
-                                            </div>
+                                              </Heading>
+                                              
+                                              {(suggestion.code || suggestion.codeExample) && (
+                                                <Box mt="2" position="relative">
+                                                  <Text size="2" weight="bold" mb="1" as="div">Code Example:</Text>
+                                                  <Box p="3" style={{ background: 'var(--gray-3)', borderRadius: 'var(--radius-2)', fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre-wrap' }}>
+                                                    {suggestion.code || suggestion.codeExample}
+                                                  </Box>
+                                                  <Box position="absolute" top="6" right="2">
+                                                    <Button variant="ghost" size="1" color="gray" onClick={() => navigator.clipboard.writeText(suggestion.code || suggestion.codeExample)}>
+                                                      <CopyIcon />
+                                                    </Button>
+                                                  </Box>
+                                                </Box>
+                                              )}
 
-                                            {suggestion.code && (
-                                              <div className="bg-gray-50 p-3 rounded-lg mt-2">
-                                                <span className="block text-sm text-gray-600 mb-1">
-                                                  Proposed Changes:
-                                                </span>
-                                                <pre className="text-black text-sm bg-gray-100 p-2 rounded-sm overflow-x-auto">
-                                                  <code>{suggestion.code}</code>
-                                                </pre>
-                                              </div>
-                                            )}
-
-                                            {suggestion.impact && (
-                                              <div className="mt-2 text-sm text-gray-600">
-                                                Expected Impact:{" "}
-                                                {suggestion.impact}
-                                              </div>
-                                            )}
-                                          </div>
+                                              {suggestion.impact && (
+                                                <Text size="2" color="jade">
+                                                  Expected Impact: {suggestion.impact}
+                                                </Text>
+                                              )}
+                                              <Flex gap="2" mt="2">
+                                                <Button color="teal" variant="solid" onClick={() => handleApplyFix(suggestion)} disabled={loadingStates.submitting}>
+                                                  {loadingStates.submitting && currentSuggestion === suggestion ? <Spinner size="2" /> : null}
+                                                  Apply Fix to GitHub
+                                                </Button>
+                                              </Flex>
+                                            </Flex>
+                                          </Card>
                                         ),
                                       )}
                                     </div>
@@ -1406,7 +1322,7 @@ function AIFix() {
           </div>
         </div>
       </div>
-    </div>
+    </Box>
   );
 }
 

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { Card as RadixCard } from '@radix-ui/themes';
 
 /**
  * Card Component
@@ -7,27 +8,24 @@ import PropTypes from 'prop-types';
 function Card({
   children,
   className = '',
-  padding = 'p-6',
   rounded = 'rounded-xl',
   shadow = true,
 }) {
-  const baseClasses =
-    'bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border';
   const shadowClass = shadow ? 'shadow-lg' : '';
 
   return (
-    <div
-      className={`${baseClasses} ${rounded} ${padding} ${shadowClass} ${className}`}
+    <RadixCard
+      variant="surface"
+      className={`${rounded} ${shadowClass} ${className}`}
     >
       {children}
-    </div>
+    </RadixCard>
   );
 }
 
 Card.propTypes = {
   children: PropTypes.node.isRequired,
   className: PropTypes.string,
-  padding: PropTypes.string,
   rounded: PropTypes.string,
   shadow: PropTypes.bool,
 };

@@ -5,7 +5,9 @@ import { useAnalysis } from "../hooks/useAnalysis";
 import LoadingState from "../components/LoadingState";
 import { config } from "../config/index.js";
 import ErrorState from "../components/ErrorState";
-import ViolationsList from "../components/ViolationsList";
+import ViolationsTable from "../features/analyzer/ViolationsTable";
+import ScoreBoard from "../features/analyzer/ScoreBoard";
+import SitePreview from "../features/analyzer/SitePreview";
 import {
   Search,
   Zap,
@@ -394,47 +396,7 @@ export default function Analyzer() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(displayResults.scores).map(([key, value]) => (
-                <div
-                  key={key}
-                  className={`relative overflow-hidden border-2 rounded-xl ${getScoreBgColor(value)}`}
-                >
-                  <div className="p-6">
-                    <div className="mb-4">
-                      <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                        {key.replace(/([A-Z])/g, " $1").trim()}
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <div
-                          className={`text-6xl font-bold tabular-nums ${getScoreColor(value)}`}
-                        >
-                          {value}
-                        </div>
-                        <div className="text-base font-medium text-muted-foreground">
-                          /100
-                        </div>
-                      </div>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${value >= 90 ? "bg-success" : value >= 50 ? "bg-warning" : "bg-destructive"}`}
-                        style={{ width: `${value}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div
-                    className={`absolute top-4 right-4 h-3 w-3 rounded-full ${
-                      value >= 90
-                        ? "bg-success"
-                        : value >= 50
-                          ? "bg-warning"
-                          : "bg-destructive"
-                    }`}
-                  />
-                </div>
-              ))}
-            </div>
+            <ScoreBoard data={displayResults} />
 
             {/* Main Content Grid - 2/3 for data, 1/3 for visuals */}
             <div className="grid gap-6 lg:grid-cols-3">
@@ -767,10 +729,11 @@ export default function Analyzer() {
 
                   {/* Violations List */}
                   <div className="mt-6">
-                    <ViolationsList
-                      violations={results.accessibility?.violations || []}
-                      incomplete={results.accessibility?.incomplete || []}
-                    />
+                    {results.accessibility?.violations?.length > 0 && (
+                      <ViolationsTable
+                        violations={results.accessibility.violations}
+                      />
+                    )}
                   </div>
 
                   {/* Call 4 — DOM scan error: non-blocking notice below violations */}
@@ -889,48 +852,12 @@ export default function Analyzer() {
 
                   <div className="space-y-6">
                     {/* Main Screenshot */}
-                    <div className="relative group">
-                      <div className="aspect-video rounded-lg border-2 bg-muted overflow-hidden flex items-center justify-center relative">
-                        {screenshotLoading ? (
-                          <div className="text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
-                            <p className="text-xs text-muted-foreground animate-pulse">Capturing screenshot...</p>
-                          </div>
-                        ) : screenshotError ? (
-                          <div className="text-center p-4">
-                            <AlertTriangle className="h-6 w-6 text-destructive mx-auto mb-2" />
-                            <p className="text-xs text-muted-foreground">{screenshotError}</p>
-                          </div>
-                        ) : screenshotUrl ? (
-                          <img
-                            src={screenshotUrl}
-                            alt={`${selectedDevice} screenshot`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-center">
-                            <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-xs">Screenshot preview</p>
-                            <p className="text-[10px]">
-                              {selectedDevice === "desktop"
-                                ? "1920×1080"
-                                : "375×667"}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-1 text-[10px] bg-background/90 backdrop-blur border rounded">
-                          {selectedDevice === "desktop"
-                            ? "1920×1080"
-                            : "375×667"}
-                        </span>
-                      </div>
-                      <button className="absolute bottom-2 right-2 px-2 py-1 text-xs bg-secondary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                        <ZoomIn className="h-3 w-3" />
-                        Expand
-                      </button>
-                    </div>
+                    <SitePreview
+                      screenshot={screenshotUrl}
+                      loading={screenshotLoading}
+                      error={screenshotError}
+                      device={selectedDevice}
+                    />
 
                     {/* Core Web Vitals */}
                     <div>

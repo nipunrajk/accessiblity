@@ -1,100 +1,74 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Moon, Sun, Menu, Zap } from "lucide-react";
+import { useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { Menu, Zap } from "lucide-react";
+import { Flex, Heading, Link, Badge, IconButton, Box } from "@radix-ui/themes";
 
 export function Header() {
-  const [theme, setTheme] = useState("light");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    setTheme(isDark ? "dark" : "light");
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    document.documentElement.classList.toggle("dark");
-  };
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-8">
-          <Link to="/analyzer" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
+    <Flex asChild align="center" justify="between" p="4" className="sticky top-0 z-50 w-full backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header>
+        <Flex align="center" gap="8">
+          <RouterLink to="/analyzer" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500">
+              <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">FastFix</span>
-          </Link>
+            <Heading size="4" weight="bold" color="teal">FastFix</Heading>
+          </RouterLink>
 
-          <nav className="hidden items-center gap-6 md:flex">
-            <Link
-              to="/analyzer"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Analyzer
-            </Link>
-            <Link
-              to="/github-config"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              GitHub Config
-            </Link>
-          </nav>
-        </div>
+          <Flex asChild align="center" gap="6" className="hidden md:flex">
+            <nav>
+              <Link asChild color="gray" weight="medium">
+                <RouterLink to="/analyzer">Analyzer</RouterLink>
+              </Link>
+              <Link asChild color="gray" weight="medium">
+                <RouterLink to="/github-config">GitHub Config</RouterLink>
+              </Link>
+            </nav>
+          </Flex>
+        </Flex>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
-          >
-            {theme === "light" ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
-          </button>
+        <Flex align="center" gap="4">
+          <Badge color="teal" variant="surface" className="hidden sm:inline-flex">Dark</Badge>
 
-          <div className="relative">
-            <button
+          <Box className="relative">
+            <IconButton
+              variant="ghost"
+              color="gray"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground"
             >
               <Menu className="h-5 w-5" />
-            </button>
+            </IconButton>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-md border bg-popover p-1 shadow-md">
-                <Link
-                  to="/login"
-                  className="block px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Login
+              <Box className="absolute right-0 mt-2 w-48 rounded-md bg-popover p-1 shadow-md">
+                <Link asChild color="gray">
+                  <RouterLink
+                    to="/login"
+                    className="block px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Login
+                  </RouterLink>
                 </Link>
-                <Link
-                  to="/"
-                  className="block px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Sign Up
+                <Link asChild color="gray">
+                  <RouterLink
+                    to="/"
+                    className="block px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Sign Up
+                  </RouterLink>
                 </Link>
-                <button
-                  onClick={() => {
-                    toggleTheme();
-                    setMenuOpen(false);
-                  }}
-                  className="sm:hidden w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground"
-                >
-                  {theme === "light" ? "Dark Mode" : "Light Mode"}
-                </button>
-              </div>
+                <div className="sm:hidden w-full text-left px-3 py-2 text-sm">
+                  <Badge color="teal" variant="surface">Dark</Badge>
+                </div>
+              </Box>
             )}
-          </div>
-        </div>
-      </div>
-    </header>
+          </Box>
+        </Flex>
+      </header>
+    </Flex>
   );
 }

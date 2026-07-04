@@ -1,7 +1,9 @@
 import { InputHTMLAttributes, forwardRef } from 'react';
+import { TextField } from '@radix-ui/themes';
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   className?: string;
+  size?: '1' | '2' | '3';
 }
 
 /**
@@ -9,11 +11,12 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * Reusable input field with consistent styling
  */
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className = '', type = 'text', ...props }, ref) => {
+  ({ className = '', type = 'text', size, ...props }, ref) => {
     return (
-      <input
+      <TextField.Root
         type={type}
-        className={`flex h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-base text-gray-900 placeholder:text-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${className}`}
+        size={size}
+        className={className}
         ref={ref}
         {...props}
       />
