@@ -1,10 +1,7 @@
-import { AxePuppeteer } from 'axe-puppeteer';
-import puppeteer from 'puppeteer';
-import logger from '../../utils/logger.js';
-import {
-  createExternalAPIError,
-  createInternalError,
-} from '../../utils/errorHandler.js';
+import { AxePuppeteer } from "axe-puppeteer";
+import puppeteer from "puppeteer";
+import logger from "../../utils/logger.js";
+import { createExternalAPIError } from "../../utils/errorHandler.js";
 
 /**
  * Axe-Core Service
@@ -14,24 +11,26 @@ import {
 class AxeService {
   constructor() {
     this.browserConfig = {
-      headless: 'new',
+      headless: "new",
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920x1080',
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+        "--window-size=1920x1080",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process",
       ],
     };
 
     // Default Axe configuration
     this.defaultAxeConfig = {
       runOnly: {
-        type: 'tag',
-        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'], // WCAG 2.2 AA compliance
+        type: "tag",
+        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"], // WCAG 2.2 AA compliance
       },
-      resultTypes: ['violations', 'incomplete', 'passes'],
+      resultTypes: ["violations", "incomplete", "passes"],
       timeout: 30000,
     };
   }
@@ -47,12 +46,12 @@ class AxeService {
     const page = await browser.newPage();
 
     try {
-      logger.info('Starting Axe-Core analysis', { url });
+      logger.info("Starting Axe-Core analysis", { url });
 
       // Navigate to page
       await page.setViewport({ width: 1920, height: 1080 });
       await page.goto(url, {
-        waitUntil: 'networkidle2',
+        waitUntil: "networkidle2",
         timeout: 30000,
       });
 
@@ -68,11 +67,11 @@ class AxeService {
 
       // Inject axe-core if not already present
       await page.addScriptTag({
-        url: 'https://unpkg.com/axe-core@4.10.3/axe.min.js',
+        url: "https://unpkg.com/axe-core@4.10.3/axe.min.js",
       });
 
       // Wait for axe to be available
-      await page.waitForFunction(() => typeof window.axe !== 'undefined');
+      await page.waitForFunction(() => typeof window.axe !== "undefined");
 
       // Run Axe analysis
       const axeConfig = {
@@ -84,7 +83,7 @@ class AxeService {
         .configure(axeConfig)
         .analyze();
 
-      logger.success('Axe-Core analysis completed', {
+      logger.success("Axe-Core analysis completed", {
         url,
         violations: results.violations.length,
         incomplete: results.incomplete.length,
@@ -103,8 +102,8 @@ class AxeService {
         testEnvironment: results.testEnvironment,
       };
     } catch (error) {
-      logger.error('Axe-Core analysis failed', error, { url });
-      throw createExternalAPIError('Axe-Core', error);
+      logger.error("Axe-Core analysis failed", error, { url });
+      throw createExternalAPIError("Axe-Core", error);
     } finally {
       await browser.close();
     }
@@ -121,7 +120,7 @@ class AxeService {
     const results = [];
     const totalPages = urls.length;
 
-    logger.info('Starting multi-page Axe-Core analysis', {
+    logger.info("Starting multi-page Axe-Core analysis", {
       totalPages,
     });
 
@@ -141,7 +140,7 @@ class AxeService {
           });
         }
       } catch (error) {
-        logger.error('Failed to analyze page', error, { url });
+        logger.error("Failed to analyze page", error, { url });
         results.push({
           url,
           error: error.message,
@@ -160,7 +159,7 @@ class AxeService {
       }
     }
 
-    logger.success('Multi-page Axe-Core analysis completed', {
+    logger.success("Multi-page Axe-Core analysis completed", {
       totalPages,
       successful: results.filter((r) => r.success !== false).length,
       failed: results.filter((r) => r.success === false).length,
@@ -175,18 +174,18 @@ class AxeService {
    * @param {string} level - WCAG level ('A', 'AA', 'AAA')
    * @returns {Promise<Object>} Analysis results
    */
-  async analyzeByWCAGLevel(url, level = 'AA') {
+  async analyzeByWCAGLevel(url, level = "AA") {
     const tagMap = {
-      A: ['wcag2a', 'wcag21a', 'wcag22a'],
-      AA: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+      A: ["wcag2a", "wcag21a", "wcag22a"],
+      AA: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
       AAA: [
-        'wcag2a',
-        'wcag2aa',
-        'wcag2aaa',
-        'wcag21a',
-        'wcag21aa',
-        'wcag21aaa',
-        'wcag22aa', // WCAG 2.2 AA (no AAA tags yet in axe-core)
+        "wcag2a",
+        "wcag2aa",
+        "wcag2aaa",
+        "wcag21a",
+        "wcag21aa",
+        "wcag21aaa",
+        "wcag22aa", // WCAG 2.2 AA (no AAA tags yet in axe-core)
       ],
     };
 
@@ -195,7 +194,7 @@ class AxeService {
     return this.analyzePage(url, {
       axeConfig: {
         runOnly: {
-          type: 'tag',
+          type: "tag",
           values: tags,
         },
       },
@@ -210,7 +209,7 @@ class AxeService {
   async getViolationsOnly(url) {
     return this.analyzePage(url, {
       axeConfig: {
-        resultTypes: ['violations'],
+        resultTypes: ["violations"],
       },
     });
   }
@@ -226,7 +225,7 @@ class AxeService {
     const page = await browser.newPage();
 
     try {
-      await page.goto(url, { waitUntil: 'networkidle2' });
+      await page.goto(url, { waitUntil: "networkidle2" });
 
       // Check if element exists
       const elementExists = await page.$(selector);
@@ -259,7 +258,7 @@ class AxeService {
 
     try {
       // Create a blank page to get rules
-      await page.goto('about:blank');
+      await page.goto("about:blank");
 
       const rules = await page.evaluate(() => {
         return window.axe.getRules();
@@ -305,7 +304,7 @@ class AxeService {
     });
 
     // Add passes
-    passes.forEach((pass) => {
+    passes.forEach(() => {
       totalWeight += 1;
     });
 
@@ -320,10 +319,10 @@ class AxeService {
       violations: violations.length,
       incomplete: incomplete.length,
       passes: passes.length,
-      criticalIssues: violations.filter((v) => v.impact === 'critical').length,
-      seriousIssues: violations.filter((v) => v.impact === 'serious').length,
-      moderateIssues: violations.filter((v) => v.impact === 'moderate').length,
-      minorIssues: violations.filter((v) => v.impact === 'minor').length,
+      criticalIssues: violations.filter((v) => v.impact === "critical").length,
+      seriousIssues: violations.filter((v) => v.impact === "serious").length,
+      moderateIssues: violations.filter((v) => v.impact === "moderate").length,
+      minorIssues: violations.filter((v) => v.impact === "minor").length,
     };
   }
 }

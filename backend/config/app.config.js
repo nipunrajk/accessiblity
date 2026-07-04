@@ -7,19 +7,24 @@ export const appConfig = {
   // Server Configuration
   server: {
     port: process.env.PORT || 3001,
-    env: process.env.NODE_ENV || 'development',
-    frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5176',
+    env: process.env.NODE_ENV || "development",
+    frontendUrl: process.env.FRONTEND_URL || "http://localhost:5176",
   },
 
   // Request Configuration
   request: {
-    sizeLimit: '10mb',
+    sizeLimit: "10mb",
     timeout: 60000, // 60 seconds
   },
 
   // CORS Configuration
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5176',
+    origin: [
+      process.env.FRONTEND_URL,
+      "http://localhost:5176",
+      "http://localhost:5177",
+      "http://localhost:5173",
+    ].filter(Boolean),
     credentials: true,
   },
 
@@ -32,24 +37,24 @@ export const appConfig = {
 
   // Puppeteer Configuration
   puppeteer: {
-    headless: 'new',
+    headless: "new",
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-      '--window-size=1920x1080',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--disable-gpu",
+      "--window-size=1920x1080",
+      "--disable-web-security",
+      "--disable-features=IsolateOrigins,site-per-process",
     ],
-    waitUntil: 'networkidle0',
+    waitUntil: "networkidle0",
     defaultTimeout: 30000,
   },
 
   // GitHub Configuration
   github: {
-    apiBaseUrl: 'https://api.github.com',
+    apiBaseUrl: "https://api.github.com",
     minTokenLength: 10,
   },
 };
