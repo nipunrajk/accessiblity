@@ -11,7 +11,7 @@ class LighthouseService {
   constructor() {
     this.browserConfig = {
       headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

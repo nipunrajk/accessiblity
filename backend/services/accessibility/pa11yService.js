@@ -18,7 +18,7 @@ class Pa11yService {
       timeout: 30000,
       wait: 2000,
       chromeLaunchConfig: {
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+        ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
