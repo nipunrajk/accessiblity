@@ -21,6 +21,11 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory
 WORKDIR /app
 
+# Tell Puppeteer to use the installed Chromium and skip downloading its own
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_PATH=/usr/bin/chromium
+
 # Copy package files
 COPY package*.json ./
 
