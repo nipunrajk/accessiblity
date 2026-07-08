@@ -27,23 +27,22 @@ class ScreenshotService {
   }
 
   async initBrowser() {
-    if (!this.browser) {
-      this.browser = await puppeteer.launch({
-        headless: 'new',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
-        ],
-      });
-      logger.info('Puppeteer browser initialized');
-    }
-    return this.browser;
+    // Always create a fresh browser instance to avoid stale connections on Render
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+      ],
+    });
+    logger.info('Puppeteer browser initialized for screenshot');
+    return browser;
   }
 
   async captureScreenshot(url, options = {}) {
@@ -111,6 +110,7 @@ class ScreenshotService {
       };
     } finally {
       await page.close();
+      await browser.close();
     }
   }
 

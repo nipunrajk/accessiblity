@@ -113,6 +113,15 @@ class AnalysisAPI {
 
               if (data.done) {
                 logger.success('Website analysis completed', { url });
+                // Debug: log the raw response structure
+                console.log('[DEBUG] done packet received:', JSON.stringify({
+                  performance_score: data.performance?.score,
+                  accessibility_score: data.accessibility?.score,
+                  bestPractices_score: data.bestPractices?.score,
+                  seo_score: data.seo?.score,
+                  has_scanStats: !!data.scanStats,
+                  keys: Object.keys(data),
+                }));
 
                 return {
                   scores: data.scores || {
