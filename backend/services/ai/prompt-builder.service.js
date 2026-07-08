@@ -239,10 +239,26 @@ You are a web performance and accessibility expert. Generate specific recommenda
 
 ${issuesList}
 
-For each issue, provide ${this.maxRecommendationsPerIssue} specific, actionable recommendations.
+For each issue, provide up to ${this.maxRecommendationsPerIssue} specific, actionable recommendations.
 Focus on the most impactful fixes that address the root cause of each issue.
 
-Format your response as a structured list with clear implementation steps and code examples where applicable.
+IMPORTANT: You MUST return your response as a single, valid JSON object containing exactly one key: "suggestions". 
+The "suggestions" object should map the EXACT issue title to an array of recommendation objects.
+
+Do not include any markdown formatting (like \`\`\`json) or extra text. ONLY return valid JSON.
+Use the following schema:
+{
+  "suggestions": {
+    "Issue Title 1": [
+      {
+        "description": "Short title of the fix",
+        "implementation": "Detailed steps to fix the issue",
+        "codeExample": "Code snippet showing the fix (if applicable, else empty string)",
+        "expectedImpact": "What this will improve"
+      }
+    ]
+  }
+}
 `;
   }
 

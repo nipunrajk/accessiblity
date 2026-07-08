@@ -1,12 +1,10 @@
-// Load environment variables FIRST before any other imports
+// Note: Environment variables are loaded via --env-file flag in package.json start script
+// so they are available before any module evaluation (ES module safe).
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import dotenv from "dotenv";
+import { dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-dotenv.config({ path: join(__dirname, ".env") });
 
 // Now import everything else
 import express from "express";

@@ -24,6 +24,8 @@ class AIController {
    */
   constructor(aiService) {
     this.aiService = aiService;
+    this.getAnalysis = this.getAnalysis.bind(this);
+    this.getFixes = this.getFixes.bind(this);
   }
 
   /**

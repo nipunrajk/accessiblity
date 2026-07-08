@@ -39,22 +39,40 @@ class AIAnalysisService {
       return null;
     }
 
-    const suggestions = {};
+    if (issues.length === 0) {
+      return {};
+    }
+
+    let suggestions = {};
     const uniqueIssues = this._getUniqueIssues(issues);
     const limitedIssues = uniqueIssues.slice(0, AI.MAX_ISSUES_TO_PROCESS);
 
-    logger.debug('Generating AI fixes', {
+    logger.debug('Generating batched AI fixes', {
       totalIssues: issues.length,
       uniqueIssues: uniqueIssues.length,
       processing: limitedIssues.length,
     });
 
-    for (const issue of limitedIssues) {
-      try {
-        const recommendations = await this.getIssueRecommendations(issue);
-        suggestions[issue.title] = recommendations;
-      } catch (error) {
-        logger.error(`Failed to get recommendations for ${issue.title}`, error);
+    try {
+      // Need to instantiate promptBuilder if it's not a singleton or use a new instance
+      const promptBuilder = new PromptBuilderService();
+      const prompt = promptBuilder.buildBatchFixesPrompt(limitedIssues);
+      const content = await aiProvider.invoke(prompt);
+
+      if (content) {
+        // Find JSON block if it's wrapped in markdown
+        let jsonStr = content;
+        const match = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) jsonStr = match[1];
+
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.suggestions) {
+          suggestions = parsed.suggestions;
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to generate batched AI fixes', error);
+      for (const issue of limitedIssues) {
         suggestions[issue.title] = this._getErrorRecommendation();
       }
     }
@@ -66,7 +84,7 @@ class AIAnalysisService {
       });
     }
 
-    return hasResults ? suggestions : null;
+    return suggestions;
   }
 
   /**

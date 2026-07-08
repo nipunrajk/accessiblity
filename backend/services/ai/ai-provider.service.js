@@ -152,7 +152,8 @@ class AIProviderService {
    * @returns {Promise<string>} The AI response content
    * @throws {Error} If API call fails
    */
-  async _invokeOpenAICompatible(prompt) {
+  async _invokeOpenAICompatible(prompt, retryCount = 0) {
+    const MAX_RETRIES = 3;
     const headers = {
       'Content-Type': 'application/json',
     };
@@ -185,6 +186,26 @@ class AIProviderService {
 
     if (!response.ok) {
       const errorBody = await response.text();
+
+      // Handle rate limiting with automatic retry
+      if (response.status === 429 && retryCount < MAX_RETRIES) {
+        // Read Retry-After header or parse from error body, default to 30s
+        let retryAfter = parseInt(response.headers.get('Retry-After') || '30', 10);
+        try {
+          const parsed = JSON.parse(errorBody);
+          const raw = parsed?.error?.metadata?.retry_after_seconds_raw;
+          if (raw) retryAfter = Math.ceil(raw) + 2; // add 2s buffer
+        } catch (_) {}
+
+        logger.warn(`Rate limited by ${this.providerConfig.name}. Retrying in ${retryAfter}s (attempt ${retryCount + 1}/${MAX_RETRIES})`, {
+          retryAfter,
+          attempt: retryCount + 1,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        return this._invokeOpenAICompatible(prompt, retryCount + 1);
+      }
+
       logger.error(`${this.providerConfig.name} API error`, null, {
         status: response.status,
         statusText: response.statusText,
@@ -199,6 +220,7 @@ class AIProviderService {
     logger.debug(`${this.providerConfig.name} API response received`);
     return data.choices?.[0]?.message?.content || '';
   }
+
 
   /**
    * Invokes Anthropic API (Claude)
