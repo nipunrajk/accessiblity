@@ -11,7 +11,8 @@ import { createInternalError } from '../../utils/errorHandler.js';
 class ElementScannerService {
   constructor() {
     this.browserConfig = {
-      headless: PUPPETEER.HEADLESS,
+      headless: "new",
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
       args: PUPPETEER.ARGS,
     };
   }
