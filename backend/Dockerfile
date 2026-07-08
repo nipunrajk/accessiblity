@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     libpangocairo-1.0-0 \
     libatk1.0-0 \
     libcups2 \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
