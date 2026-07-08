@@ -49,50 +49,58 @@ class AnalysisOrchestratorService {
         progress: 0,
       });
 
-      // Run all accessibility tools in parallel
+      // Run all accessibility tools SEQUENTIALLY to prevent Out of Memory on Render's 512MB free tier.
       const startTime = Date.now();
 
-      const lighthousePromise = this._runLighthouseAnalysis(url, onProgress);
+      let scanResults = null;
+      try {
+        scanResults = await this._runLighthouseAnalysis(url, onProgress);
+      } catch (e) {
+        logger.error('Lighthouse failed', e);
+      }
 
-      let axePromise = null;
+      let axeResults = null;
       if (includeAxe) {
         this._sendProgress(onProgress, {
           message: 'Running Axe-Core accessibility analysis...',
           progress: 10,
         });
-        axePromise = this._runAxeAnalysis(url);
+        try {
+          axeResults = await this._runAxeAnalysis(url);
+        } catch (e) {
+          logger.error('Axe failed', e);
+        }
       }
 
-      let pa11yPromise = null;
+      let pa11yResults = null;
       if (includePa11y) {
         this._sendProgress(onProgress, {
           message: 'Running Pa11y multi-engine analysis...',
           progress: 15,
         });
-        pa11yPromise = this._runPa11yAnalysis(url);
+        try {
+          pa11yResults = await this._runPa11yAnalysis(url);
+        } catch (e) {
+          logger.error('Pa11y failed', e);
+        }
       }
 
-      let keyboardPromise = null;
+      let keyboardResults = null;
       if (includeKeyboard) {
         this._sendProgress(onProgress, {
           message: 'Running keyboard accessibility testing...',
           progress: 20,
         });
-        keyboardPromise = this._runKeyboardAnalysis(url);
+        try {
+          keyboardResults = await this._runKeyboardAnalysis(url);
+        } catch (e) {
+          logger.error('Keyboard analysis failed', e);
+        }
       }
-
-      // Wait for all enabled analyses to complete
-      const [scanResults, axeResults, pa11yResults, keyboardResults] =
-        await Promise.all([
-          lighthousePromise,
-          axePromise,
-          pa11yPromise,
-          keyboardPromise,
-        ]);
 
       const parallelAnalysisTime = Date.now() - startTime;
 
-      logger.performance('Parallel analysis completed', {
+      logger.performance('Sequential analysis completed', {
         duration: parallelAnalysisTime,
         includedAxe: includeAxe,
         includedPa11y: includePa11y,
@@ -100,7 +108,7 @@ class AnalysisOrchestratorService {
       });
 
       // Extract main results
-      const mainResults = scanResults.urls[0]?.scores || {
+      const mainResults = scanResults?.urls?.[0]?.scores || {
         performance: { score: 0 },
         accessibility: { score: 0 },
         bestPractices: { score: 0 },
@@ -176,9 +184,9 @@ class AnalysisOrchestratorService {
       const baseResponse = {
         ...finalResults,
         scanStats: {
-          pagesScanned: scanResults.stats.pagesScanned,
-          totalPages: scanResults.stats.totalPages,
-          scannedUrls: scanResults.urls.map((u) => u.url),
+          pagesScanned: scanResults?.stats?.pagesScanned || 0,
+          totalPages: scanResults?.stats?.totalPages || 0,
+          scannedUrls: scanResults?.urls?.map((u) => u.url) || [],
         },
         toolsEnabled: {
           axe: includeAxe,
