@@ -1,0 +1,100 @@
+name: 'FastFix Website Auditor'
+description: 'Runs comprehensive website quality audits (Performance, Accessibility, SEO, Best Practices) in your CI pipeline.'
+author: 'FastFix Team'
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  url:
+    description: 'The target web page URL to analyze.'
+    required: true
+  include-ai:
+    description: 'Enables AI analysis. (default: false)'
+    required: false
+    default: 'false'
+  include-axe:
+    description: 'Run Axe-Core accessibility testing. (default: true)'
+    required: false
+    default: 'true'
+  include-pa11y:
+    description: 'Run Pa11y accessibility testing. (default: true)'
+    required: false
+    default: 'true'
+  include-keyboard:
+    description: 'Run Puppeteer keyboard accessibility testing. (default: true)'
+    required: false
+    default: 'true'
+  fail-on-perf:
+    description: 'Exits with error if Performance score is below this threshold (0-100).'
+    required: false
+    default: '0'
+  fail-on-a11y:
+    description: 'Exits with error if Accessibility score is below this threshold (0-100).'
+    required: false
+    default: '0'
+  fail-on-best-practices:
+    description: 'Exits with error if Best Practices score is below this threshold (0-100).'
+    required: false
+    default: '0'
+  fail-on-seo:
+    description: 'Exits with error if SEO score is below this threshold (0-100).'
+    required: false
+    default: '0'
+  output-path:
+    description: 'The file path to save the detailed JSON audit report.'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install root dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Install backend dependencies
+      shell: bash
+      run: |
+        cd backend
+        npm ci
+
+    - name: Run FastFix CLI
+      shell: bash
+      run: |
+        # Map boolean values to CLI flags
+        AXE_FLAG=""
+        if [ "${{ inputs.include-axe }}" = "false" ]; then
+          AXE_FLAG="--no-include-axe"
+        fi
+        
+        PA11Y_FLAG=""
+        if [ "${{ inputs.include-pa11y }}" = "false" ]; then
+          PA11Y_FLAG="--no-include-pa11y"
+        fi
+        
+        KEYBOARD_FLAG=""
+        if [ "${{ inputs.include-keyboard }}" = "false" ]; then
+          KEYBOARD_FLAG="--no-include-keyboard"
+        fi
+        
+        AI_FLAG=""
+        if [ "${{ inputs.include-ai }}" = "true" ]; then
+          AI_FLAG="--include-ai"
+        fi
+        
+        OUTPUT_FLAG=""
+        if [ -n "${{ inputs.output-path }}" ]; then
+          OUTPUT_FLAG="--output ${{ inputs.output-path }}"
+        fi
+
+        node backend/cli.js --url "${{ inputs.url }}" \
+          $AI_FLAG \
+          $AXE_FLAG \
+          $PA11Y_FLAG \
+          $KEYBOARD_FLAG \
+          --fail-on-perf "${{ inputs.fail-on-perf }}" \
+          --fail-on-a11y "${{ inputs.fail-on-a11y }}" \
+          --fail-on-best-practices "${{ inputs.fail-on-best-practices }}" \
+          --fail-on-seo "${{ inputs.fail-on-seo }}" \
+          $OUTPUT_FLAG

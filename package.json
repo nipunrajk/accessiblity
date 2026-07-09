@@ -12,6 +12,7 @@
     "unlighthouse": "npx @unlighthouse/cli --site localhost:5173",
     "ai:setup": "node scripts/ai-setup.js",
     "ai:status": "node scripts/ai-setup.js",
+    "cli": "node backend/cli.js",
     "prepare": "husky",
     "precommit": "lint-staged"
   },

@@ -1,0 +1,53 @@
+name: FastFix Quality Auditing CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    # Run once a week on Sunday at midnight to monitor live site health
+    - cron: '0 0 * * 0'
+
+jobs:
+  audit-website:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Example 1: Run audits against a public/staging URL
+      - name: Audit Staging Website
+        uses: ./
+        with:
+          url: 'https://example.com'
+          include-axe: 'true'
+          include-pa11y: 'true'
+          include-keyboard: 'true'
+          fail-on-a11y: '80'
+          fail-on-perf: '50'
+          output-path: 'reports/example-audit.json'
+
+      # Example 2: Audit local dev server (uncomment if you want to test local builds before deploy)
+      # - name: Start Local Application Server
+      #   run: |
+      #     npm run dev &
+      #     npx wait-on http://localhost:5173 --timeout 30000
+      # - name: Audit Local Build
+      #   uses: ./
+      #   with:
+      #     url: 'http://localhost:5173'
+      #     fail-on-a11y: '90'
+
+      - name: Upload Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastfix-reports
+          path: reports/
