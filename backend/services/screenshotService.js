@@ -32,10 +32,11 @@ class ScreenshotService {
   }
 
   async captureScreenshot(url, options = {}) {
-    const browser = await this.initBrowser();
-    const page = await browser.newPage();
-
+    let browser = null;
+    let page = null;
     try {
+      browser = await this.initBrowser();
+      page = await browser.newPage();
       await page.setViewport({
         width: options.width || 1200,
         height: options.height || 800,
@@ -95,8 +96,8 @@ class ScreenshotService {
         error: error.message,
       };
     } finally {
-      await page.close();
-      await browser.close();
+      if (page) await page.close().catch(e => console.error('Error closing page', e));
+      if (browser) await browser.close().catch(e => console.error('Error closing browser', e));
     }
   }
 

@@ -20,6 +20,8 @@ const BROWSERCAT_API_KEY = process.env.BROWSERCAT_API_KEY;
 export async function getBrowser() {
   if (BROWSERCAT_API_KEY) {
     logger.info('Connecting to BrowserCat remote browser');
+    const keyPrefix = BROWSERCAT_API_KEY ? BROWSERCAT_API_KEY.substring(0, 4) + '...' : 'NONE';
+    console.log(`[DEBUG] Attempting BrowserCat connection with key: ${keyPrefix}`);
     try {
       const browser = await puppeteer.connect({
         browserWSEndpoint: BROWSERCAT_WS,
@@ -27,9 +29,11 @@ export async function getBrowser() {
           'Api-Key': BROWSERCAT_API_KEY,
         },
       });
+      console.log(`[DEBUG] Successfully connected to BrowserCat`);
       logger.success('Connected to BrowserCat');
       return browser;
     } catch (err) {
+      console.error(`[DEBUG] BrowserCat connection threw an error: ${err.message}`);
       logger.error('BrowserCat connection failed', err);
       throw new Error(`BrowserCat Error: ${err.message}. Check your API key and credits.`);
     }
