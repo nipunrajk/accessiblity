@@ -106,10 +106,31 @@ class LighthouseService {
     return discovered;
   }
 
+  /**
+   * Analyze a page using chrome-launcher (Lighthouse needs a local Chrome port).
+   * BrowserCat remote browsers don't work here because Lighthouse
+   * connects via localhost:PORT, not WebSocket.
+   */
   async analyzePage(page, url) {
+    let chrome;
     try {
+      const chromeFlags = [
+        '--headless',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ];
+
+      const launchOpts = { chromeFlags };
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOpts.chromePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      }
+
+      chrome = await chromeLauncher.launch(launchOpts);
+
       const result = await lighthouse(url, {
-        port: new URL(page.browser().wsEndpoint()).port,
+        port: chrome.port,
         output: 'json',
         logLevel: 'error',
         onlyCategories: [
@@ -125,6 +146,10 @@ class LighthouseService {
     } catch (error) {
       logger.error('Lighthouse analysis failed for page', error, { url });
       throw createExternalAPIError('Lighthouse', error);
+    } finally {
+      if (chrome) {
+        await chrome.kill();
+      }
     }
   }
 
@@ -280,32 +305,24 @@ class LighthouseService {
       routes.push(url);
     }
 
-    const browser = await getBrowser();
+    for (const route of routes) {
+      try {
+        // analyzePage now manages its own Chrome instance via chrome-launcher
+        const result = await this.analyzePage(null, route);
+        if (result) {
+          scannedUrls.push({ url: route, scores: result });
+          pagesScanned++;
 
-    try {
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(30000);
-
-      for (const route of routes) {
-        try {
-          const result = await this.analyzePage(page, route);
-          if (result) {
-            scannedUrls.push({ url: route, scores: result });
-            pagesScanned++;
-
-            sendProgress({
-              pagesScanned,
-              totalPages: totalPages || 1,
-              scannedUrls: scannedUrls.map((u) => u.url),
-            });
-          }
-        } catch (error) {
-          logger.error(`Failed to analyze page`, error, { url: route });
-          // Continue with other pages even if one fails
+          sendProgress({
+            pagesScanned,
+            totalPages: totalPages || 1,
+            scannedUrls: scannedUrls.map((u) => u.url),
+          });
         }
+      } catch (error) {
+        logger.error(`Failed to analyze page`, error, { url: route });
+        // Continue with other pages even if one fails
       }
-    } finally {
-      await browser.close();
     }
 
     return {
