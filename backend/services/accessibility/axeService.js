@@ -1,5 +1,5 @@
 import { AxePuppeteer } from 'axe-puppeteer';
-import puppeteer from 'puppeteer';
+import { getBrowser } from '../browser.service.js';
 import logger from '../../utils/logger.js';
 import {
   createExternalAPIError,
@@ -44,7 +44,7 @@ class AxeService {
    * @returns {Promise<Object>} Axe analysis results
    */
   async analyzePage(url, options = {}) {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {
@@ -223,7 +223,7 @@ class AxeService {
    * @returns {Promise<Object>} Analysis results for element
    */
   async analyzeElement(url, selector) {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {
@@ -255,7 +255,7 @@ class AxeService {
    * @returns {Promise<Array>} List of all Axe rules
    */
   async getAvailableRules() {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {

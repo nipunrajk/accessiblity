@@ -58,3 +58,6 @@ backend/.env
 # Screenshots (can be removed manually)
 screenshots/
 *.png
+
+# Agent Customizations
+.agents/

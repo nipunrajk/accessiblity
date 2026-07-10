@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import logger from '../utils/logger.js';
+import { getBrowser } from './browser.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,22 +28,7 @@ class ScreenshotService {
   }
 
   async initBrowser() {
-    // Always create a fresh browser instance to avoid stale connections on Render
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-      ],
-    });
-    logger.info('Puppeteer browser initialized for screenshot');
-    return browser;
+    return getBrowser();
   }
 
   async captureScreenshot(url, options = {}) {

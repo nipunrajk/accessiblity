@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import { getBrowser } from '../browser.service.js';
 import logger from '../../utils/logger.js';
 import { createExternalAPIError } from '../../utils/errorHandler.js';
 
@@ -29,7 +29,7 @@ class KeyboardService {
    * @returns {Promise<Object>} Keyboard accessibility results
    */
   async analyzePage(url, options = {}) {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {

@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import { getBrowser } from '../browser.service.js';
 import logger from '../../utils/logger.js';
 import { PUPPETEER } from '../../constants/index.js';
 import { createInternalError } from '../../utils/errorHandler.js';
@@ -30,7 +30,7 @@ class ElementScannerService {
       logger.info('Starting element scanning', { url });
 
       // Launch browser
-      browser = await puppeteer.launch(this.browserConfig);
+      browser = await getBrowser();
       page = await browser.newPage();
 
       // Navigate to page
@@ -115,7 +115,7 @@ class ElementScannerService {
     try {
       logger.info('Starting selective element scanning', { url, selector });
 
-      browser = await puppeteer.launch(this.browserConfig);
+      browser = await getBrowser();
       page = await browser.newPage();
       await page.goto(url, { waitUntil: PUPPETEER.WAIT_UNTIL });
 

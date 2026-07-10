@@ -1,32 +1,17 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
-import puppeteer from 'puppeteer';
 import logger from '../../utils/logger.js';
+import { getBrowser } from '../browser.service.js';
 import {
   createExternalAPIError,
   createInternalError,
 } from '../../utils/errorHandler.js';
 
 class LighthouseService {
-  constructor() {
-    this.browserConfig = {
-      headless: 'new',
-      ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920x1080',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-      ],
-    };
-  }
+  constructor() {}
 
   async discoverPages(url, maxPages = 1) {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     await page.setDefaultNavigationTimeout(15000);
@@ -295,7 +280,7 @@ class LighthouseService {
       routes.push(url);
     }
 
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
 
     try {
       const page = await browser.newPage();

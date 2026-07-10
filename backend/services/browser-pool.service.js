@@ -4,7 +4,7 @@
  * Provides automatic cleanup and resource management
  */
 
-import puppeteer from 'puppeteer';
+import { getBrowser } from './browser.service.js';
 import logger from '../utils/logger.js';
 
 class BrowserPoolService {
@@ -138,7 +138,7 @@ class BrowserPoolService {
    */
   async createBrowser() {
     try {
-      const browser = await puppeteer.launch(this.browserConfig);
+      const browser = await getBrowser();
 
       // Handle browser disconnection
       browser.on('disconnected', () => {

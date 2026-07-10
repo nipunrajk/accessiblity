@@ -1,5 +1,6 @@
 import pa11y from 'pa11y';
 import logger from '../../utils/logger.js';
+import { getLocalBrowserConfig } from '../browser.service.js';
 import { createExternalAPIError } from '../../utils/errorHandler.js';
 
 /**
@@ -17,15 +18,7 @@ class Pa11yService {
       includeWarnings: true,
       timeout: 30000,
       wait: 2000,
-      chromeLaunchConfig: {
-        ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-        ],
-      },
+      chromeLaunchConfig: getLocalBrowserConfig(),
       runners: ['htmlcs'], // HTML_CodeSniffer
     };
   }

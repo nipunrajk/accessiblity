@@ -1,35 +1,15 @@
 import { AxePuppeteer } from "axe-puppeteer";
-import puppeteer from "puppeteer";
 import logger from "../../utils/logger.js";
+import { getBrowser } from '../browser.service.js';
 import { createExternalAPIError } from "../../utils/errorHandler.js";
 
-/**
- * Axe-Core Service
- * Provides comprehensive WCAG 2.0/2.1/2.2 accessibility testing
- * Coverage: ~57% of WCAG issues (complements Lighthouse's ~40%)
- */
 class AxeService {
   constructor() {
-    this.browserConfig = {
-      headless: "new",
-      ...(process.env.PUPPETEER_EXECUTABLE_PATH ? { executablePath: process.env.PUPPETEER_EXECUTABLE_PATH } : {}),
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu",
-        "--window-size=1920x1080",
-        "--disable-web-security",
-        "--disable-features=IsolateOrigins,site-per-process",
-      ],
-    };
-
     // Default Axe configuration
     this.defaultAxeConfig = {
       runOnly: {
         type: "tag",
-        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"], // WCAG 2.2 AA compliance
+        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
       },
       resultTypes: ["violations", "incomplete", "passes"],
       timeout: 30000,
@@ -43,7 +23,7 @@ class AxeService {
    * @returns {Promise<Object>} Axe analysis results
    */
   async analyzePage(url, options = {}) {
-    const browser = await puppeteer.launch(this.browserConfig);
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     try {
