@@ -30,8 +30,8 @@ export async function getBrowser() {
       logger.success('Connected to BrowserCat');
       return browser;
     } catch (err) {
-      logger.error('BrowserCat connection failed, falling back to local', err);
-      // Fall through to local launch
+      logger.error('BrowserCat connection failed', err);
+      throw new Error(`BrowserCat Error: ${err.message}. Check your API key and credits.`);
     }
   }
 
