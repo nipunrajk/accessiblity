@@ -90,7 +90,27 @@ app.get("/debug/env", (req, res) => {
       : "Not set",
     AI_MODEL: config.ai.model || "Not set",
     NODE_ENV: config.app.server.env || "Not set",
+    BROWSERCAT_API_KEY: process.env.BROWSERCAT_API_KEY ? "Set (length: " + process.env.BROWSERCAT_API_KEY.length + ")" : "Not set",
   });
+});
+
+import puppeteer from 'puppeteer';
+app.get("/debug/browsercat", async (req, res) => {
+  try {
+    const key = process.env.BROWSERCAT_API_KEY;
+    if (!key) {
+      return res.json({ error: "No API key" });
+    }
+    const browser = await puppeteer.connect({
+      browserWSEndpoint: 'wss://api.browsercat.com/connect',
+      headers: { 'Api-Key': key }
+    });
+    const page = await browser.newPage();
+    await browser.close();
+    res.json({ success: true, message: "BrowserCat connected successfully" });
+  } catch (err) {
+    res.json({ success: false, error: err.message, stack: err.stack });
+  }
 });
 
 // 404 handler for undefined routes
