@@ -1,6 +1,6 @@
 import pa11y from 'pa11y';
 import logger from '../../utils/logger.js';
-import { getLocalBrowserConfig } from '../browser.service.js';
+import { getBrowser } from '../browser.service.js';
 import { createExternalAPIError } from '../../utils/errorHandler.js';
 
 /**
@@ -18,7 +18,6 @@ class Pa11yService {
       includeWarnings: true,
       timeout: 30000,
       wait: 2000,
-      chromeLaunchConfig: getLocalBrowserConfig(),
       runners: ['htmlcs'], // HTML_CodeSniffer
     };
   }
@@ -30,12 +29,16 @@ class Pa11yService {
    * @returns {Promise<Object>} Pa11y analysis results
    */
   async analyzePage(url, options = {}) {
+    let browser;
     try {
       logger.info('Starting Pa11y analysis', { url });
+
+      browser = await getBrowser();
 
       const config = {
         ...this.defaultConfig,
         ...options,
+        browser, // Pass the managed browser instance
       };
 
       const results = await pa11y(url, config);
@@ -49,6 +52,10 @@ class Pa11yService {
     } catch (error) {
       logger.error('Pa11y analysis failed', error, { url });
       throw createExternalAPIError('Pa11y', error);
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   }
 

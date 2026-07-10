@@ -106,12 +106,32 @@ class LighthouseService {
     return discovered;
   }
 
-  /**
-   * Analyze a page using chrome-launcher (Lighthouse needs a local Chrome port).
-   * BrowserCat remote browsers don't work here because Lighthouse
-   * connects via localhost:PORT, not WebSocket.
-   */
   async analyzePage(page, url) {
+    const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
+
+    // For public URLs, use PageSpeed Insights API to save memory on Render
+    if (!isLocalhost) {
+      try {
+        logger.info('Using PageSpeed Insights API for Lighthouse', { url });
+        const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(
+          url
+        )}&category=PERFORMANCE&category=ACCESSIBILITY&category=BEST_PRACTICES&category=SEO`;
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`PSI API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        if (data.lighthouseResult) {
+          return this.processLighthouseReport(data.lighthouseResult);
+        }
+      } catch (error) {
+        logger.warn('PageSpeed Insights API failed, falling back to local Lighthouse', { error: error.message, url });
+      }
+    }
+
+    // Fallback / Localhost: Use local chrome-launcher
     let chrome;
     try {
       const chromeFlags = [
