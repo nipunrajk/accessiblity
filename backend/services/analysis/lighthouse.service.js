@@ -1,5 +1,4 @@
 import lighthouse from 'lighthouse';
-import * as chromeLauncher from 'chrome-launcher';
 import logger from '../../utils/logger.js';
 import { getBrowser } from '../browser.service.js';
 import {
@@ -107,69 +106,30 @@ class LighthouseService {
   }
 
   async analyzePage(page, url) {
-    const isLocalhost = url.includes('localhost') || url.includes('127.0.0.1');
-
-    // For public URLs, use PageSpeed Insights API to save memory on Render
-    if (!isLocalhost) {
-      try {
-        logger.info('Using PageSpeed Insights API for Lighthouse', { url });
-        const apiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(
-          url
-        )}&category=PERFORMANCE&category=ACCESSIBILITY&category=BEST_PRACTICES&category=SEO`;
-        
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error(`PSI API returned ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        if (data.lighthouseResult) {
-          return this.processLighthouseReport(data.lighthouseResult);
-        }
-      } catch (error) {
-        logger.warn('PageSpeed Insights API failed, falling back to local Lighthouse', { error: error.message, url });
-      }
-    }
-
-    // Fallback / Localhost: Use local chrome-launcher
-    let chrome;
     try {
-      const chromeFlags = [
-        '--headless',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ];
-
-      const launchOpts = { chromeFlags };
-      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-        launchOpts.chromePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-      }
-
-      chrome = await chromeLauncher.launch(launchOpts);
-
-      const result = await lighthouse(url, {
-        port: chrome.port,
-        output: 'json',
-        logLevel: 'error',
-        onlyCategories: [
-          'performance',
-          'accessibility',
-          'best-practices',
-          'seo',
-        ],
-      });
+      logger.info('Running Lighthouse on BrowserCat remote page', { url });
+      
+      const result = await lighthouse(
+        url,
+        {
+          output: 'json',
+          logLevel: 'error',
+          onlyCategories: [
+            'performance',
+            'accessibility',
+            'best-practices',
+            'seo',
+          ],
+        },
+        undefined, // Config
+        page       // Puppeteer page object
+      );
 
       const report = JSON.parse(result.report);
       return this.processLighthouseReport(report);
     } catch (error) {
       logger.error('Lighthouse analysis failed for page', error, { url });
       throw createExternalAPIError('Lighthouse', error);
-    } finally {
-      if (chrome) {
-        await chrome.kill();
-      }
     }
   }
 
@@ -325,24 +285,33 @@ class LighthouseService {
       routes.push(url);
     }
 
-    for (const route of routes) {
-      try {
-        // analyzePage now manages its own Chrome instance via chrome-launcher
-        const result = await this.analyzePage(null, route);
-        if (result) {
-          scannedUrls.push({ url: route, scores: result });
-          pagesScanned++;
+    const browser = await getBrowser();
 
-          sendProgress({
-            pagesScanned,
-            totalPages: totalPages || 1,
-            scannedUrls: scannedUrls.map((u) => u.url),
-          });
+    try {
+      const page = await browser.newPage();
+      await page.setDefaultNavigationTimeout(30000);
+
+      for (const route of routes) {
+        try {
+          // analyzePage now uses the Puppeteer page object directly
+          const result = await this.analyzePage(page, route);
+          if (result) {
+            scannedUrls.push({ url: route, scores: result });
+            pagesScanned++;
+
+            sendProgress({
+              pagesScanned,
+              totalPages: totalPages || 1,
+              scannedUrls: scannedUrls.map((u) => u.url),
+            });
+          }
+        } catch (error) {
+          logger.error(`Failed to analyze page`, error, { url: route });
+          // Continue with other pages even if one fails
         }
-      } catch (error) {
-        logger.error(`Failed to analyze page`, error, { url: route });
-        // Continue with other pages even if one fails
       }
+    } finally {
+      await browser.close();
     }
 
     return {
