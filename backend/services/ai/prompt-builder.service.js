@@ -47,7 +47,13 @@ class PromptBuilderService {
       {
         maxSize: 50,
         ttl: 300000,
-        keyGenerator: (issues) => JSON.stringify(issues.map((i) => i.title)),
+        keyGenerator: (issues) =>
+          JSON.stringify(
+            issues.map((i) => ({
+              title: i.title,
+              recommendations: i.recommendations,
+            }))
+          ),
       }
     );
   }
@@ -163,6 +169,23 @@ Keep the response clear and actionable, focusing on the most impactful improveme
    * @private
    */
   _buildIssuePromptInternal(issue) {
+    let affectedInfo = '';
+    if (Array.isArray(issue.recommendations) && issue.recommendations.length > 0) {
+      const componentDetails = issue.recommendations
+        .map((rec) => {
+          let compStr = '';
+          if (rec.selector) compStr += `  - Selector: "${rec.selector}"\n`;
+          if (rec.snippet) compStr += `  - Code Snippet: \`${rec.snippet.trim()}\`\n`;
+          return compStr;
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      if (componentDetails) {
+        affectedInfo = `\nAffected Components:\n${componentDetails}`;
+      }
+    }
+
     return `
 You are a web performance and accessibility expert. Generate specific recommendations for the following issue:
 
@@ -170,6 +193,7 @@ Issue Type: ${issue.type}
 Issue Title: ${issue.title}
 Description: ${issue.description}
 Impact Score: ${issue.impact}
+${affectedInfo}
 
 For Accessibility Issues, provide recommendations based on the specific violation:
 - For missing alt attributes: Suggest appropriate alt text based on image context and purpose
@@ -182,6 +206,8 @@ For Accessibility Issues, provide recommendations based on the specific violatio
 - For multimedia: Recommend proper captions and transcripts
 - For dynamic content: Suggest proper live regions and updates
 - For touch targets: Recommend proper sizing and spacing
+
+If "Affected Components" is provided, analyze the actual component code and make your recommendations and "Code Example" responses highly specific to fixing that exact code snippet (do not just output generic examples).
 
 Please provide ${this.maxRecommendationsPerIssue} specific, actionable recommendations in this format:
 1. [Title of Recommendation]
@@ -224,14 +250,30 @@ Keep recommendations technical, specific, and focused on WCAG 2.1 compliance.
    */
   _buildBatchFixesPromptInternal(issues) {
     const issuesList = issues
-      .map(
-        (issue, index) => `
+      .map((issue, index) => {
+        let details = `
 ${index + 1}. ${issue.title}
    Type: ${issue.type}
    Description: ${issue.description}
-   Impact: ${issue.impact}
-`
-      )
+   Impact: ${issue.impact}`;
+
+        if (Array.isArray(issue.recommendations) && issue.recommendations.length > 0) {
+          const componentDetails = issue.recommendations
+            .map((rec) => {
+              let compStr = '';
+              if (rec.selector) compStr += `      - Selector: "${rec.selector}"\n`;
+              if (rec.snippet) compStr += `      - Code Snippet: \`${rec.snippet.trim()}\`\n`;
+              return compStr;
+            })
+            .filter(Boolean)
+            .join('\n');
+
+          if (componentDetails) {
+            details += `\n   Affected Components:\n${componentDetails}`;
+          }
+        }
+        return details;
+      })
       .join('\n');
 
     return `
@@ -241,6 +283,8 @@ ${issuesList}
 
 For each issue, provide up to ${this.maxRecommendationsPerIssue} specific, actionable recommendations.
 Focus on the most impactful fixes that address the root cause of each issue.
+
+If "Affected Components" or "Code Snippet" is provided for an issue, you MUST inspect the actual component code and tailor your recommended fix and "codeExample" output specifically to modify that code snippet to resolve the issue (do not just output generic examples).
 
 IMPORTANT: You MUST return your response as a single, valid JSON object containing exactly one key: "suggestions". 
 The "suggestions" object should map the EXACT issue title to an array of recommendation objects.
