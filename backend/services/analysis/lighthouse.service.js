@@ -1,4 +1,5 @@
 import lighthouse from 'lighthouse';
+import * as chromeLauncher from 'chrome-launcher';
 import logger from '../../utils/logger.js';
 import { getBrowser } from '../browser.service.js';
 import {
@@ -105,13 +106,45 @@ class LighthouseService {
     return discovered;
   }
 
-  async analyzePage(page, url) {
+  /**
+   * Analyze a page using Lighthouse with a locally-launched Chrome instance.
+   *
+   * Lighthouse 13 needs direct CDP control over the browser, which is
+   * incompatible with remote WebSocket proxies like BrowserCat.  We use
+   * chrome-launcher to start a local Chromium (the one installed by Docker
+   * at /usr/bin/chromium) and pass the CDP port to Lighthouse.
+   *
+   * @param {string} url - The URL to audit
+   * @returns {Object} Processed Lighthouse report
+   */
+  async analyzePage(url) {
+    let chrome;
     try {
-      logger.info('Running Lighthouse on BrowserCat remote page', { url });
-      
+      logger.info('Launching local Chrome for Lighthouse audit', { url });
+
+      const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+      chrome = await chromeLauncher.launch({
+        chromeFlags: [
+          '--headless',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-accelerated-2d-canvas',
+        ],
+        chromePath,
+      });
+
+      logger.info('Chrome launched for Lighthouse', {
+        port: chrome.port,
+        pid: chrome.pid,
+        chromePath: chromePath || 'default',
+      });
+
       const result = await lighthouse(
         url,
         {
+          port: chrome.port,
           output: 'json',
           logLevel: 'error',
           onlyCategories: [
@@ -121,8 +154,6 @@ class LighthouseService {
             'seo',
           ],
         },
-        undefined, // Config
-        page       // Puppeteer page object
       );
 
       const report = JSON.parse(result.report);
@@ -130,6 +161,14 @@ class LighthouseService {
     } catch (error) {
       logger.error('Lighthouse analysis failed for page', error, { url });
       throw createExternalAPIError('Lighthouse', error);
+    } finally {
+      if (chrome) {
+        try {
+          await chrome.kill();
+        } catch (killErr) {
+          logger.warn('Failed to kill Chrome after Lighthouse', killErr);
+        }
+      }
     }
   }
 
@@ -285,33 +324,25 @@ class LighthouseService {
       routes.push(url);
     }
 
-    const browser = await getBrowser();
+    // Each analyzePage call now launches and kills its own Chrome instance,
+    // so there is no shared browser to manage here.
+    for (const route of routes) {
+      try {
+        const result = await this.analyzePage(route);
+        if (result) {
+          scannedUrls.push({ url: route, scores: result });
+          pagesScanned++;
 
-    try {
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(30000);
-
-      for (const route of routes) {
-        try {
-          // analyzePage now uses the Puppeteer page object directly
-          const result = await this.analyzePage(page, route);
-          if (result) {
-            scannedUrls.push({ url: route, scores: result });
-            pagesScanned++;
-
-            sendProgress({
-              pagesScanned,
-              totalPages: totalPages || 1,
-              scannedUrls: scannedUrls.map((u) => u.url),
-            });
-          }
-        } catch (error) {
-          logger.error(`Failed to analyze page`, error, { url: route });
-          // Continue with other pages even if one fails
+          sendProgress({
+            pagesScanned,
+            totalPages: totalPages || 1,
+            scannedUrls: scannedUrls.map((u) => u.url),
+          });
         }
+      } catch (error) {
+        logger.error(`Failed to analyze page`, error, { url: route });
+        // Continue with other pages even if one fails
       }
-    } finally {
-      await browser.close();
     }
 
     return {

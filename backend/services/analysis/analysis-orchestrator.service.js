@@ -51,12 +51,19 @@ class AnalysisOrchestratorService {
 
       // Run all accessibility tools SEQUENTIALLY to prevent Out of Memory on Render's 512MB free tier.
       const startTime = Date.now();
+      const toolErrors = {};
 
       let scanResults = null;
       try {
         scanResults = await this._runLighthouseAnalysis(url, onProgress);
       } catch (e) {
         logger.error('Lighthouse failed', e);
+        toolErrors.lighthouse = e.message;
+        this._sendProgress(onProgress, {
+          message: `Lighthouse analysis failed: ${e.message}`,
+          progress: 5,
+          warning: true,
+        });
       }
 
       let axeResults = null;
@@ -69,6 +76,12 @@ class AnalysisOrchestratorService {
           axeResults = await this._runAxeAnalysis(url);
         } catch (e) {
           logger.error('Axe failed', e);
+          toolErrors.axe = e.message;
+          this._sendProgress(onProgress, {
+            message: `Axe-Core analysis failed: ${e.message}`,
+            progress: 12,
+            warning: true,
+          });
         }
       }
 
@@ -82,6 +95,12 @@ class AnalysisOrchestratorService {
           pa11yResults = await this._runPa11yAnalysis(url);
         } catch (e) {
           logger.error('Pa11y failed', e);
+          toolErrors.pa11y = e.message;
+          this._sendProgress(onProgress, {
+            message: `Pa11y analysis failed: ${e.message}`,
+            progress: 17,
+            warning: true,
+          });
         }
       }
 
@@ -95,6 +114,12 @@ class AnalysisOrchestratorService {
           keyboardResults = await this._runKeyboardAnalysis(url);
         } catch (e) {
           logger.error('Keyboard analysis failed', e);
+          toolErrors.keyboard = e.message;
+          this._sendProgress(onProgress, {
+            message: `Keyboard analysis failed: ${e.message}`,
+            progress: 22,
+            warning: true,
+          });
         }
       }
 
@@ -228,6 +253,7 @@ class AnalysisOrchestratorService {
         ...baseResponse,
         aiInsights,
         aiFixes,
+        toolErrors: Object.keys(toolErrors).length > 0 ? toolErrors : undefined,
         done: true,
         progress: 100,
       };
@@ -325,7 +351,7 @@ class AnalysisOrchestratorService {
     try {
       // Collect all issues for fix generation
       const allIssues = [];
-      scanResults.urls.forEach((urlResult) => {
+      (scanResults?.urls || []).forEach((urlResult) => {
         if (urlResult.scores) {
           // Collect issues from all categories
           ['performance', 'accessibility', 'bestPractices', 'seo'].forEach(
@@ -408,7 +434,7 @@ class AnalysisOrchestratorService {
 
       // Generate AI fixes for issues if available
       const allIssues = [];
-      scanResults.urls.forEach((urlResult) => {
+      (scanResults?.urls || []).forEach((urlResult) => {
         if (urlResult.scores) {
           // Collect issues from all categories
           ['performance', 'accessibility', 'bestPractices', 'seo'].forEach(
