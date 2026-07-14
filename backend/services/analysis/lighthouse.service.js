@@ -1,11 +1,29 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
+import puppeteer from 'puppeteer';
 import logger from '../../utils/logger.js';
 import { getBrowser } from '../browser.service.js';
 import {
   createExternalAPIError,
   createInternalError,
 } from '../../utils/errorHandler.js';
+
+/**
+ * Resolve the Chrome/Chromium executable path for chrome-launcher.
+ * Priority:
+ *  1. PUPPETEER_EXECUTABLE_PATH env var (Docker deployments with system Chromium)
+ *  2. Puppeteer's bundled Chrome (native Node deployments like Render)
+ * @returns {Promise<string>}
+ */
+async function resolveChromePath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  // Puppeteer v25+ executablePath() returns a Promise
+  const puppeteerPath = await puppeteer.executablePath();
+  logger.info('Using Puppeteer bundled Chrome for Lighthouse', { puppeteerPath });
+  return puppeteerPath;
+}
 
 class LighthouseService {
   constructor() {}
@@ -122,7 +140,7 @@ class LighthouseService {
     try {
       logger.info('Launching local Chrome for Lighthouse audit', { url });
 
-      const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+      const chromePath = await resolveChromePath();
       chrome = await chromeLauncher.launch({
         chromeFlags: [
           '--headless',
