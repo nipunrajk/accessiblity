@@ -34,12 +34,12 @@ export async function getBrowser() {
       return browser;
     } catch (err) {
       console.error(`[DEBUG] BrowserCat connection threw an error: ${err.message}`);
-      logger.error('BrowserCat connection failed', err);
-      throw new Error(`BrowserCat Error: ${err.message}. Check your API key and credits.`);
+      logger.error('BrowserCat connection failed, falling back to local browser', err);
+      // Fall through to local launch below instead of throwing
     }
   }
 
-  // Local launch (dev / non-BrowserCat environments)
+  // Local launch (dev / non-BrowserCat environments or fallback)
   logger.info('Launching local Puppeteer browser');
   const launchOptions = {
     headless: 'new',
