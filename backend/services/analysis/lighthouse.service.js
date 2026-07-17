@@ -443,7 +443,13 @@ class LighthouseService {
   }
 
   async scanWebsite(url, sendProgress) {
-    const routes = await this.discoverPages(url);
+    const mode = this._resolveMode(url);
+
+    // In psi / psi-only mode for public URLs, skip browser-based page
+    // discovery entirely — PageSpeed Insights audits the given URL directly,
+    // so we never need a BrowserCat/local Chrome crawl on the host.
+    const routes = mode === "local" ? await this.discoverPages(url) : [url];
+
     const scannedUrls = [];
     const totalPages = routes.length;
     let pagesScanned = 0;
@@ -457,8 +463,6 @@ class LighthouseService {
       routes.push(url);
     }
 
-    // Each analyzePage call now launches and kills its own Chrome instance,
-    // so there is no shared browser to manage here.
     for (const route of routes) {
       try {
         const result = await this.analyzePage(route);

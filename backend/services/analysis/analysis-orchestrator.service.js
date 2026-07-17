@@ -278,13 +278,21 @@ class AnalysisOrchestratorService {
       this._sendProgress(onProgress, progress);
     };
 
-    const results = await lighthouseService.scanWebsite(url, sendProgress);
+    try {
+      const results = await lighthouseService.scanWebsite(url, sendProgress);
 
-    logger.success("Lighthouse analysis completed", {
-      pagesScanned: results.stats.pagesScanned,
-    });
+      logger.success("Lighthouse analysis completed", {
+        pagesScanned: results.stats.pagesScanned,
+      });
 
-    return results;
+      return results;
+    } catch (error) {
+      // Never let a Lighthouse failure abort the entire analysis.
+      // The orchestrator's outer try/catch already records this into
+      // toolErrors.lighthouse; rethrow so it's captured there.
+      logger.error("Lighthouse analysis threw", error, { url });
+      throw error;
+    }
   }
 
   /**
