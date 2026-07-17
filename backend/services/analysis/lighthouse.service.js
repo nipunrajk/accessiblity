@@ -1,12 +1,9 @@
-import lighthouse from 'lighthouse';
-import * as chromeLauncher from 'chrome-launcher';
-import puppeteer from 'puppeteer';
-import logger from '../../utils/logger.js';
-import { getBrowser } from '../browser.service.js';
-import {
-  createExternalAPIError,
-  createInternalError,
-} from '../../utils/errorHandler.js';
+import lighthouse from "lighthouse";
+import * as chromeLauncher from "chrome-launcher";
+import puppeteer from "puppeteer";
+import logger from "../../utils/logger.js";
+import { getBrowser } from "../browser.service.js";
+import { createExternalAPIError } from "../../utils/errorHandler.js";
 
 /**
  * Resolve the Chrome/Chromium executable path for chrome-launcher.
@@ -21,7 +18,9 @@ async function resolveChromePath() {
   }
   // Puppeteer v25+ executablePath() returns a Promise
   const puppeteerPath = await puppeteer.executablePath();
-  logger.info('Using Puppeteer bundled Chrome for Lighthouse', { puppeteerPath });
+  logger.info("Using Puppeteer bundled Chrome for Lighthouse", {
+    puppeteerPath,
+  });
   return puppeteerPath;
 }
 
@@ -36,10 +35,10 @@ class LighthouseService {
     await page.setRequestInterception(true);
 
     // Optimize performance by blocking unnecessary resources
-    page.on('request', (request) => {
+    page.on("request", (request) => {
       const resourceType = request.resourceType();
       if (
-        ['image', 'stylesheet', 'font', 'media', 'other'].includes(resourceType)
+        ["image", "stylesheet", "font", "media", "other"].includes(resourceType)
       ) {
         request.abort();
       } else {
@@ -58,7 +57,7 @@ class LighthouseService {
 
         try {
           const response = await page.goto(currentUrl, {
-            waitUntil: 'domcontentloaded',
+            waitUntil: "domcontentloaded",
             timeout: 15000,
           });
 
@@ -68,17 +67,17 @@ class LighthouseService {
 
             // Find all links on the page
             const links = await page.evaluate(() => {
-              return Array.from(document.querySelectorAll('a[href]'))
+              return Array.from(document.querySelectorAll("a[href]"))
                 .map((link) => {
                   try {
                     const href = link.href;
                     if (
-                      href.startsWith('tel:') ||
-                      href.startsWith('mailto:') ||
-                      href.includes('javascript:') ||
-                      href.endsWith('.pdf') ||
-                      href.endsWith('.jpg') ||
-                      href.endsWith('.png')
+                      href.startsWith("tel:") ||
+                      href.startsWith("mailto:") ||
+                      href.includes("javascript:") ||
+                      href.endsWith(".pdf") ||
+                      href.endsWith(".jpg") ||
+                      href.endsWith(".png")
                     ) {
                       return null;
                     }
@@ -87,7 +86,7 @@ class LighthouseService {
                     return null;
                   }
                 })
-                .filter((href) => href && href.startsWith('http'));
+                .filter((href) => href && href.startsWith("http"));
             });
 
             // Add new links to toVisit if they're from the same domain
@@ -99,17 +98,18 @@ class LighthouseService {
                   normalizedLink.startsWith(baseUrl) &&
                   !visited.has(normalizedLink) &&
                   !toVisit.includes(normalizedLink) &&
-                  !normalizedLink.includes('#')
+                  !normalizedLink.includes("#")
                 ) {
                   toVisit.push(normalizedLink);
                 }
-              } catch (error) {
+                // eslint-disable-next-line no-unused-vars
+              } catch (_error) {
                 // Silently ignore invalid URLs
               }
             }
           }
         } catch (error) {
-          if (error.name !== 'TimeoutError') {
+          if (error.name !== "TimeoutError") {
             logger.warn(`Failed to visit page during discovery`, {
               url: currentUrl,
               error: error.message,
@@ -125,69 +125,181 @@ class LighthouseService {
   }
 
   /**
-   * Analyze a page using Lighthouse with a locally-launched Chrome instance.
+   * Resolve Lighthouse execution mode.
    *
-   * Lighthouse 13 needs direct CDP control over the browser, which is
-   * incompatible with remote WebSocket proxies like BrowserCat.  We use
-   * chrome-launcher to start a local Chromium (the one installed by Docker
-   * at /usr/bin/chromium) and pass the CDP port to Lighthouse.
+   * LIGHTHOUSE_MODE (env) controls where Lighthouse runs:
+   *   - 'psi'       (default): public URLs use the free PageSpeed Insights API
+   *                            (Google runs Lighthouse on its own servers — no
+   *                            Chrome on the host, safe for 512MB free tiers).
+   *                            PSI failures fall back to local Chrome.
+   *   - 'local':     Always launch a local Chrome via chrome-launcher. Use this
+   *                  for self-hosted/firewalled deployments where PSI cannot
+   *                  reach the site, or when you want a full local audit.
+   *   - 'psi-only': Always use PSI, never fall back to local Chrome (fails
+   *                  loudly if PSI is unavailable).
+   *
+   * localhost / 127.0.0.1 URLs always use local Chrome, since PSI cannot reach
+   * them.
+   *
+   * @param {string} url - The URL to audit
+   * @returns {string} One of 'psi' | 'local' | 'psi-only'
+   */
+  _resolveMode(url) {
+    const isLocalhost = url.includes("localhost") || url.includes("127.0.0.1");
+    if (isLocalhost) return "local";
+
+    const mode = (process.env.LIGHTHOUSE_MODE || "psi").toLowerCase();
+    if (!["psi", "local", "psi-only"].includes(mode)) {
+      logger.warn(`Invalid LIGHTHOUSE_MODE "${mode}", defaulting to "psi"`, {
+        url,
+      });
+      return "psi";
+    }
+    return mode;
+  }
+
+  /**
+   * Analyze a page with Lighthouse.
+   *
+   * Routing logic:
+   *   - localhost URL  -> local Chrome (PSI can't reach internal sites)
+   *   - public + 'psi'      -> PSI API, fall back to local Chrome on failure
+   *   - public + 'psi-only' -> PSI API only (no local Chrome fallback)
+   *   - public + 'local'    -> local Chrome
    *
    * @param {string} url - The URL to audit
    * @returns {Object} Processed Lighthouse report
    */
   async analyzePage(url) {
+    const mode = this._resolveMode(url);
+
+    if (mode === "local") {
+      return this._runLocalLighthouse(url);
+    }
+
+    // PSI path (psi or psi-only)
+    try {
+      return await this._runPageSpeedInsights(url);
+    } catch (error) {
+      if (mode === "psi-only") {
+        logger.error(
+          "PageSpeed Insights API failed (psi-only mode, no fallback)",
+          error,
+          {
+            url,
+          },
+        );
+        throw error;
+      }
+      logger.warn(
+        "PageSpeed Insights API failed, falling back to local Lighthouse",
+        {
+          error: error.message,
+          url,
+        },
+      );
+      return this._runLocalLighthouse(url);
+    }
+  }
+
+  /**
+   * Run Lighthouse by launching a local Chrome instance (chrome-launcher).
+   *
+   * Chrome is resolved from PUPPETEER_EXECUTABLE_PATH if set, otherwise from
+   * Puppeteer's bundled Chrome (the typical case in local development). This
+   * path is used for localhost URLs and as a fallback / opt-in for hosted
+   * deployments that choose to run Lighthouse on the host itself.
+   *
+   * @param {string} url - The URL to audit
+   * @returns {Object} Processed Lighthouse report
+   */
+  async _runLocalLighthouse(url) {
     let chrome;
     try {
-      logger.info('Launching local Chrome for Lighthouse audit', { url });
+      logger.info("Launching local Chrome for Lighthouse audit", { url });
 
       const chromePath = await resolveChromePath();
       chrome = await chromeLauncher.launch({
         chromeFlags: [
-          '--headless',
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--disable-accelerated-2d-canvas',
+          "--headless",
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--disable-accelerated-2d-canvas",
         ],
         chromePath,
       });
 
-      logger.info('Chrome launched for Lighthouse', {
+      logger.info("Chrome launched for Lighthouse", {
         port: chrome.port,
         pid: chrome.pid,
-        chromePath: chromePath || 'default',
+        chromePath: chromePath || "default",
       });
 
-      const result = await lighthouse(
-        url,
-        {
-          port: chrome.port,
-          output: 'json',
-          logLevel: 'error',
-          onlyCategories: [
-            'performance',
-            'accessibility',
-            'best-practices',
-            'seo',
-          ],
-        },
-      );
+      const result = await lighthouse(url, {
+        port: chrome.port,
+        output: "json",
+        logLevel: "error",
+        onlyCategories: [
+          "performance",
+          "accessibility",
+          "best-practices",
+          "seo",
+        ],
+      });
 
       const report = JSON.parse(result.report);
       return this.processLighthouseReport(report);
     } catch (error) {
-      logger.error('Lighthouse analysis failed for page', error, { url });
-      throw createExternalAPIError('Lighthouse', error);
+      logger.error("Lighthouse analysis failed for page", error, { url });
+      throw createExternalAPIError("Lighthouse", error);
     } finally {
       if (chrome) {
         try {
           await chrome.kill();
         } catch (killErr) {
-          logger.warn('Failed to kill Chrome after Lighthouse', killErr);
+          logger.warn("Failed to kill Chrome after Lighthouse", killErr);
         }
       }
     }
+  }
+
+  /**
+   * Run Lighthouse via the free PageSpeed Insights API.
+   * Google executes Lighthouse on its own servers and returns a standard
+   * lighthouseResult payload, so no local Chrome is required.
+   *
+   * @param {string} url - The public URL to audit
+   * @returns {Object} Processed Lighthouse report
+   */
+  async _runPageSpeedInsights(url) {
+    logger.info("Using PageSpeed Insights API for Lighthouse audit", { url });
+
+    const apiUrl =
+      `https://www.googleapis.com/pagespeedonline/v5/runPagespeed` +
+      `?url=${encodeURIComponent(url)}` +
+      `&category=PERFORMANCE&category=ACCESSIBILITY&category=BEST_PRACTICES&category=SEO`;
+
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw createExternalAPIError(
+        "PageSpeed Insights",
+        new Error(
+          `PSI API returned ${response.status}: ${response.statusText}`,
+        ),
+      );
+    }
+
+    const data = await response.json();
+    if (!data?.lighthouseResult) {
+      throw createExternalAPIError(
+        "PageSpeed Insights",
+        new Error("PSI response missing lighthouseResult"),
+      );
+    }
+
+    return this.processLighthouseReport(data.lighthouseResult);
   }
 
   processLighthouseReport(report) {
@@ -230,8 +342,8 @@ class LighthouseService {
             recommendations:
               audit.details?.items
                 ?.map((item) => ({
-                  snippet: item.node?.snippet || item.source || '',
-                  selector: item.node?.selector || '',
+                  snippet: item.node?.snippet || item.source || "",
+                  selector: item.node?.selector || "",
                   suggestion: item.suggestion || audit.description,
                 }))
                 .filter((rec) => rec.snippet || rec.selector)
@@ -244,7 +356,7 @@ class LighthouseService {
       return issues.filter((issue, index) => {
         const totalImpact = issues.reduce(
           (sum, i) => sum + parseFloat(i.impact),
-          0
+          0,
         );
         let cumulativeImpact = 0;
         for (let i = 0; i <= index; i++) {
@@ -259,70 +371,73 @@ class LighthouseService {
         score: categories.performance.score * 100,
         metrics: {
           fcp: {
-            score: audits['first-contentful-paint'].score * 100,
-            value: audits['first-contentful-paint'].numericValue,
+            score: audits["first-contentful-paint"].score * 100,
+            value: audits["first-contentful-paint"].numericValue,
           },
           lcp: {
-            score: audits['largest-contentful-paint'].score * 100,
-            value: audits['largest-contentful-paint'].numericValue,
+            score: audits["largest-contentful-paint"].score * 100,
+            value: audits["largest-contentful-paint"].numericValue,
           },
           tbt: {
-            score: audits['total-blocking-time'].score * 100,
-            value: audits['total-blocking-time'].numericValue,
+            score: audits["total-blocking-time"].score * 100,
+            value: audits["total-blocking-time"].numericValue,
           },
           cls: {
-            score: audits['cumulative-layout-shift'].score * 100,
-            value: audits['cumulative-layout-shift'].numericValue,
+            score: audits["cumulative-layout-shift"].score * 100,
+            value: audits["cumulative-layout-shift"].numericValue,
           },
           si: {
-            score: audits['speed-index'].score * 100,
-            value: audits['speed-index'].numericValue,
+            score: audits["speed-index"].score * 100,
+            value: audits["speed-index"].numericValue,
           },
           tti: {
-            score: audits['interactive'].score * 100,
-            value: audits['interactive'].numericValue,
+            score: audits["interactive"].score * 100,
+            value: audits["interactive"].numericValue,
           },
         },
-        issues: extractIssues('performance', categories.performance),
+        issues: extractIssues("performance", categories.performance),
       },
       accessibility: {
         score: categories.accessibility.score * 100,
         audits: {
           passed: categories.accessibility.auditRefs.filter(
-            (ref) => audits[ref.id].score === 1
+            (ref) => audits[ref.id].score === 1,
           ).length,
           failed: categories.accessibility.auditRefs.filter(
-            (ref) => audits[ref.id].score !== 1 && audits[ref.id].score !== null
+            (ref) =>
+              audits[ref.id].score !== 1 && audits[ref.id].score !== null,
           ).length,
           total: categories.accessibility.auditRefs.length,
         },
-        issues: extractIssues('accessibility', categories.accessibility),
+        issues: extractIssues("accessibility", categories.accessibility),
       },
       bestPractices: {
-        score: categories['best-practices'].score * 100,
+        score: categories["best-practices"].score * 100,
         audits: {
-          passed: categories['best-practices'].auditRefs.filter(
-            (ref) => audits[ref.id].score === 1
+          passed: categories["best-practices"].auditRefs.filter(
+            (ref) => audits[ref.id].score === 1,
           ).length,
-          failed: categories['best-practices'].auditRefs.filter(
-            (ref) => audits[ref.id].score !== 1 && audits[ref.id].score !== null
+          failed: categories["best-practices"].auditRefs.filter(
+            (ref) =>
+              audits[ref.id].score !== 1 && audits[ref.id].score !== null,
           ).length,
-          total: categories['best-practices'].auditRefs.length,
+          total: categories["best-practices"].auditRefs.length,
         },
-        issues: extractIssues('best-practices', categories['best-practices']),
+        issues: extractIssues("best-practices", categories["best-practices"]),
       },
       seo: {
         score: categories.seo.score * 100,
         audits: {
           passed: categories.seo.auditRefs.filter(
-            (ref) => audits[ref.id].score === 1
+            (ref) => audits[ref.id].score === 1,
           ).length,
           failed: categories.seo.auditRefs.filter(
-            (ref) => audits[ref.id].score !== 1 && audits[ref.id].score !== null
+            (ref) =>
+              audits[ref.id].score !== 1 && audits[ref.id].score !== null,
           ).length,
           total: categories.seo.auditRefs.length,
         },
-        issues: extractIssues('seo', categories.seo),
+        issues: extractIssues("seo", categories.seo),
       },
     };
   }

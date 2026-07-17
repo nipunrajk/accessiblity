@@ -8,7 +8,7 @@
  * @module services/ai/ai-provider
  */
 
-import logger from '../../utils/logger.js';
+import logger from "../../utils/logger.js";
 
 /**
  * AI Provider Service Class
@@ -48,8 +48,8 @@ class AIProviderService {
 
     if (!providerConfig) {
       const errorMsg = `Unknown provider: ${provider}. Available: ${Object.keys(
-        this.config.providers
-      ).join(', ')}`;
+        this.config.providers,
+      ).join(", ")}`;
       logger.error(errorMsg);
       return { available: false, error: errorMsg };
     }
@@ -58,7 +58,7 @@ class AIProviderService {
     const finalModel = this.config.model || providerConfig.defaultModel;
 
     // Check if API key is needed
-    const needsApiKey = provider !== 'ollama';
+    const needsApiKey = provider !== "ollama";
     const available = !needsApiKey || !!this.config.apiKey;
 
     return {
@@ -86,8 +86,8 @@ class AIProviderService {
     } else {
       logger.warn(
         `AI not available. ${
-          this.providerConfig.error || 'Add AI_API_KEY to .env file.'
-        }`
+          this.providerConfig.error || "Add AI_API_KEY to .env file."
+        }`,
       );
     }
   }
@@ -104,6 +104,110 @@ class AIProviderService {
    */
   isAvailable() {
     return this.providerConfig.available;
+  }
+
+  /**
+   * Whether the currently configured model can accept image input.
+   * Matched against the visionModels allowlist (substring, case-insensitive).
+   * @returns {boolean}
+   */
+  supportsVision() {
+    const model = (this.providerConfig.model || "").toLowerCase();
+    const allowlist = this.config.visionModels || [];
+    return allowlist.some((m) => model.includes(m.toLowerCase()));
+  }
+
+  /**
+   * Invoke the AI provider with a text prompt plus an optional image.
+   * If the model is not vision-capable, the image is silently dropped and the
+   * call falls back to text-only — preventing "model does not support image
+   * input" errors from ever reaching the user.
+   *
+   * @param {string} prompt - The text prompt
+   * @param {Object} [image] - Optional image payload
+   * @param {string} image.url - data URL (e.g. "data:image/png;base64,...")
+   * @returns {Promise<string>} AI response content
+   */
+  async invokeWithImage(prompt, image) {
+    if (image && image.url && this.supportsVision()) {
+      return this._invokeOpenAICompatibleWithImage(prompt, image.url);
+    }
+    return this.invoke(prompt);
+  }
+
+  async _invokeOpenAICompatibleWithImage(prompt, imageUrl, retryCount = 0) {
+    const MAX_RETRIES = 3;
+    const headers = { "Content-Type": "application/json" };
+    if (this.providerConfig.authHeader && this.providerConfig.apiKey) {
+      const authValue = this.providerConfig.authPrefix
+        ? `${this.providerConfig.authPrefix} ${this.providerConfig.apiKey}`
+        : this.providerConfig.apiKey;
+      headers[this.providerConfig.authHeader] = authValue;
+    }
+
+    const response = await fetch(
+      `${this.providerConfig.baseUrl}/chat/completions`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: this.providerConfig.model,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                { type: "image_url", image_url: { url: imageUrl } },
+              ],
+            },
+          ],
+          temperature: this.config.temperature,
+          max_tokens: this.config.maxTokens,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      if (response.status === 429 && retryCount < MAX_RETRIES) {
+        let retryAfter = parseInt(
+          response.headers.get("Retry-After") || "30",
+          10,
+        );
+        try {
+          const parsed = JSON.parse(errorBody);
+          const raw = parsed?.error?.metadata?.retry_after_seconds_raw;
+          if (raw) retryAfter = Math.ceil(raw) + 2;
+          // eslint-disable-next-line no-unused-vars
+        } catch (_err) {
+          /* ignore */
+        }
+        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+        return this._invokeOpenAICompatibleWithImage(
+          prompt,
+          imageUrl,
+          retryCount + 1,
+        );
+      }
+      // If the model unexpectedly rejects the image, retry as text-only.
+      if (response.status === 400) {
+        logger.warn("Model rejected image input, falling back to text-only", {
+          model: this.providerConfig.model,
+        });
+        return this.invoke(prompt);
+      }
+      logger.error(`${this.providerConfig.name} API error`, null, {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody,
+      });
+      throw new Error(
+        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`,
+      );
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
   }
 
   /**
@@ -125,21 +229,21 @@ class AIProviderService {
     if (!this.providerConfig.available) {
       throw new Error(
         `AI not configured. ${
-          this.providerConfig.error || 'Add AI_API_KEY to .env file.'
-        }`
+          this.providerConfig.error || "Add AI_API_KEY to .env file."
+        }`,
       );
     }
 
     switch (this.providerConfig.type) {
-      case 'openai':
+      case "openai":
         return await this._invokeOpenAICompatible(prompt);
-      case 'anthropic':
+      case "anthropic":
         return await this._invokeAnthropic(prompt);
-      case 'ollama':
+      case "ollama":
         return await this._invokeOllama(prompt);
       default:
         throw new Error(
-          `Unsupported provider type: ${this.providerConfig.type}`
+          `Unsupported provider type: ${this.providerConfig.type}`,
         );
     }
   }
@@ -155,7 +259,7 @@ class AIProviderService {
   async _invokeOpenAICompatible(prompt, retryCount = 0) {
     const MAX_RETRIES = 3;
     const headers = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Add auth header if needed
@@ -173,15 +277,15 @@ class AIProviderService {
     const response = await fetch(
       `${this.providerConfig.baseUrl}/chat/completions`,
       {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           model: this.providerConfig.model,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: "user", content: prompt }],
           temperature: this.config.temperature,
           max_tokens: this.config.maxTokens,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -190,19 +294,28 @@ class AIProviderService {
       // Handle rate limiting with automatic retry
       if (response.status === 429 && retryCount < MAX_RETRIES) {
         // Read Retry-After header or parse from error body, default to 30s
-        let retryAfter = parseInt(response.headers.get('Retry-After') || '30', 10);
+        let retryAfter = parseInt(
+          response.headers.get("Retry-After") || "30",
+          10,
+        );
         try {
           const parsed = JSON.parse(errorBody);
           const raw = parsed?.error?.metadata?.retry_after_seconds_raw;
           if (raw) retryAfter = Math.ceil(raw) + 2; // add 2s buffer
-        } catch (_) {}
+          // eslint-disable-next-line no-unused-vars
+        } catch (_err) {
+          /* ignore */
+        }
 
-        logger.warn(`Rate limited by ${this.providerConfig.name}. Retrying in ${retryAfter}s (attempt ${retryCount + 1}/${MAX_RETRIES})`, {
-          retryAfter,
-          attempt: retryCount + 1,
-        });
+        logger.warn(
+          `Rate limited by ${this.providerConfig.name}. Retrying in ${retryAfter}s (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+          {
+            retryAfter,
+            attempt: retryCount + 1,
+          },
+        );
 
-        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+        await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
         return this._invokeOpenAICompatible(prompt, retryCount + 1);
       }
 
@@ -212,15 +325,14 @@ class AIProviderService {
         errorBody,
       });
       throw new Error(
-        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`
+        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`,
       );
     }
 
     const data = await response.json();
     logger.debug(`${this.providerConfig.name} API response received`);
-    return data.choices?.[0]?.message?.content || '';
+    return data.choices?.[0]?.message?.content || "";
   }
-
 
   /**
    * Invokes Anthropic API (Claude)
@@ -236,16 +348,16 @@ class AIProviderService {
     });
 
     const response = await fetch(`${this.providerConfig.baseUrl}/messages`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'x-api-key': this.providerConfig.apiKey,
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
+        "x-api-key": this.providerConfig.apiKey,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: this.providerConfig.model,
         max_tokens: this.config.maxTokens,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: "user", content: prompt }],
       }),
     });
 
@@ -257,13 +369,13 @@ class AIProviderService {
         errorBody,
       });
       throw new Error(
-        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`
+        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`,
       );
     }
 
     const data = await response.json();
     logger.debug(`${this.providerConfig.name} API response received`);
-    return data.content?.[0]?.text || '';
+    return data.content?.[0]?.text || "";
   }
 
   /**
@@ -282,16 +394,16 @@ class AIProviderService {
     const response = await fetch(
       `${this.providerConfig.baseUrl}/api/generate`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           model: this.providerConfig.model,
           prompt: prompt,
           stream: false,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -302,13 +414,13 @@ class AIProviderService {
         errorBody,
       });
       throw new Error(
-        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`
+        `${this.providerConfig.name} API error: ${response.statusText} - ${errorBody}`,
       );
     }
 
     const data = await response.json();
     logger.debug(`${this.providerConfig.name} API response received`);
-    return data.response || '';
+    return data.response || "";
   }
 
   /**

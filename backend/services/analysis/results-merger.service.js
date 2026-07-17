@@ -1,4 +1,4 @@
-import logger from '../../utils/logger.js';
+import logger from "../../utils/logger.js";
 import {
   calculateWeightedScore,
   getGrade,
@@ -7,7 +7,7 @@ import {
   convertPa11yIssueToCommon,
   deduplicateIssues,
   calculateWCAGCompliance,
-} from '../../utils/transformers.js';
+} from "../../utils/transformers.js";
 
 /**
  * Results Merger
@@ -22,25 +22,25 @@ class ResultsMerger {
    * @param {Object} pa11yResults - Pa11y analysis results
    * @returns {Object} Merged results
    */
-  mergeResults(lighthouseResults, axeResults, pa11yResults = null) {
-    logger.info('Merging Lighthouse, Axe-Core, and Pa11y results');
+  mergeResults(lighthouseResults, axeResults = null, pa11yResults = null) {
+    logger.info("Merging Lighthouse, Axe-Core, and Pa11y results");
 
     const merged = {
-      url: lighthouseResults.url || axeResults.url,
+      url: lighthouseResults.url || axeResults?.url || pa11yResults?.pageUrl,
       timestamp: new Date().toISOString(),
 
       // Combined scores
       scores: this.calculateCombinedScores(
         lighthouseResults,
         axeResults,
-        pa11yResults
+        pa11yResults,
       ),
 
       // Accessibility results
       accessibility: this.mergeAccessibilityResults(
         lighthouseResults.accessibility,
         axeResults,
-        pa11yResults
+        pa11yResults,
       ),
 
       // Keep other Lighthouse categories
@@ -67,10 +67,10 @@ class ResultsMerger {
       },
     };
 
-    logger.success('Results merged successfully', {
+    logger.success("Results merged successfully", {
       totalIssues: merged.accessibility.issues.length,
       lighthouseIssues: lighthouseResults.accessibility?.issues?.length || 0,
-      axeViolations: axeResults.violations?.length || 0,
+      axeViolations: axeResults?.violations?.length || 0,
       pa11yIssues: pa11yResults?.issues?.length || 0,
     });
 
@@ -81,7 +81,11 @@ class ResultsMerger {
    * Calculate combined scores
    * @private
    */
-  calculateCombinedScores(lighthouseResults, axeResults, pa11yResults = null) {
+  calculateCombinedScores(
+    lighthouseResults,
+    axeResults = null,
+    pa11yResults = null,
+  ) {
     const lighthouseScore = lighthouseResults.accessibility?.score || 0;
 
     // Calculate Axe score (0-100)
@@ -95,7 +99,7 @@ class ResultsMerger {
     if (pa11yResults) {
       // 40% Lighthouse, 40% Axe, 20% Pa11y
       combinedScore = Math.round(
-        lighthouseScore * 0.4 + axeScore * 0.4 + pa11yScore * 0.2
+        lighthouseScore * 0.4 + axeScore * 0.4 + pa11yScore * 0.2,
       );
     } else {
       // 50% Lighthouse, 50% Axe
@@ -116,6 +120,7 @@ class ResultsMerger {
    * @private
    */
   calculateAxeScore(axeResults) {
+    if (!axeResults) return 0;
     const { violations = [], incomplete = [], passes = [] } = axeResults;
     return calculateWeightedScore(violations, incomplete, passes);
   }
@@ -126,12 +131,12 @@ class ResultsMerger {
    */
   mergeAccessibilityResults(
     lighthouseAccessibility,
-    axeResults,
-    pa11yResults = null
+    axeResults = null,
+    pa11yResults = null,
   ) {
     const lighthouseIssues = lighthouseAccessibility?.issues || [];
-    const axeViolations = axeResults.violations || [];
-    const axeIncomplete = axeResults.incomplete || [];
+    const axeViolations = axeResults?.violations || [];
+    const axeIncomplete = axeResults?.incomplete || [];
     const pa11yIssues = pa11yResults?.issues || [];
 
     // Convert Axe violations to common format
@@ -154,25 +159,25 @@ class ResultsMerger {
       score: this.calculateCombinedScores(
         { accessibility: lighthouseAccessibility },
         axeResults,
-        pa11yResults
+        pa11yResults,
       ).combined,
       issues: uniqueIssues,
       summary: {
         total: uniqueIssues.length,
-        critical: uniqueIssues.filter((i) => i.severity === 'critical').length,
-        serious: uniqueIssues.filter((i) => i.severity === 'serious').length,
-        moderate: uniqueIssues.filter((i) => i.severity === 'moderate').length,
-        minor: uniqueIssues.filter((i) => i.severity === 'minor').length,
+        critical: uniqueIssues.filter((i) => i.severity === "critical").length,
+        serious: uniqueIssues.filter((i) => i.severity === "serious").length,
+        moderate: uniqueIssues.filter((i) => i.severity === "moderate").length,
+        minor: uniqueIssues.filter((i) => i.severity === "minor").length,
         bySource: {
           lighthouse: uniqueIssues.filter((i) =>
-            i.detectedBy?.includes('lighthouse')
+            i.detectedBy?.includes("lighthouse"),
           ).length,
-          axe: uniqueIssues.filter((i) => i.detectedBy?.includes('axe-core'))
+          axe: uniqueIssues.filter((i) => i.detectedBy?.includes("axe-core"))
             .length,
-          pa11y: uniqueIssues.filter((i) => i.detectedBy?.includes('pa11y'))
+          pa11y: uniqueIssues.filter((i) => i.detectedBy?.includes("pa11y"))
             .length,
           keyboard: uniqueIssues.filter((i) =>
-            i.detectedBy?.includes('keyboard')
+            i.detectedBy?.includes("keyboard"),
           ).length,
           multiple: uniqueIssues.filter((i) => i.detectedBy?.length > 1).length,
         },

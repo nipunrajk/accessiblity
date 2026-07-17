@@ -110,21 +110,53 @@ OPENROUTER_API_KEY=your_openrouter_key
 OPENAI_MODEL=gpt-3.5-turbo
 ANTHROPIC_MODEL=claude-3-haiku-20240307
 GROQ_MODEL=mixtral-8x7b-32768
-OPENROUTER_MODEL=x-ai/grok-4-fast:free
+OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free
 
 # GitHub Integration (Optional)
 GITHUB_TOKEN=your_github_personal_access_token
+
+# Lighthouse Execution Mode (optional, default: psi)
+# Controls where Lighthouse runs:
+#   psi       - Public URLs use the free PageSpeed Insights (PSI) API (Google
+#               runs Lighthouse on its own servers, so no Chrome is launched on
+#               the host). PSI failures fall back to local Chrome. Recommended
+#               for free-tier / memory-constrained deployments.
+#   local     - Always launch a local Chrome via chrome-launcher. Use for
+#               self-hosted/firewalled sites or to run Lighthouse on the host
+#               itself (requires Chrome; set PUPPETEER_EXECUTABLE_PATH if using
+#               the system Chromium instead of Puppeteer's bundled Chrome).
+#   psi-only  - Always use PSI, never fall back to local Chrome (fails loudly
+#               if PSI is unavailable).
+# Note: localhost / 127.0.0.1 URLs ALWAYS use local Chrome, regardless of mode
+# (PSI cannot reach internal sites).
+LIGHTHOUSE_MODE=psi
 ```
+
+### Lighthouse Execution Modes
+
+FastFix can run Lighthouse two ways, selected with the `LIGHTHOUSE_MODE` env var:
+
+| Mode | Public URLs | localhost URLs | Chrome on host? |
+|------|-------------|----------------|-----------------|
+| `psi` (default) | PageSpeed Insights API, falls back to local Chrome on failure | local Chrome | Only as fallback |
+| `local` | local Chrome (chrome-launcher) | local Chrome | Yes (always) |
+| `psi-only` | PageSpeed Insights API only | local Chrome | Never |
+
+- **Free tier / Render:** use `psi` (no Chrome launched → no OOM on 512MB).
+- **Self-hosted / paid / bigger box:** use `local` to run Chrome on the host.
+- `local` mode needs a Chrome binary: set `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`
+  (Dockerfile build) or leave it unset to use Puppeteer's bundled Chrome.
+
 
 ## 🤖 AI Configuration (Optional)
 
 Choose any AI provider in `backend/.env`:
 
 ```env
-# OpenRouter (Free Grok model recommended)
+# OpenRouter (Free vision-capable model recommended)
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=your_key
-OPENROUTER_MODEL=x-ai/grok-4-fast:free
+OPENROUTER_MODEL=google/gemma-4-26b-a4b-it:free
 
 # Or use: openai, anthropic, groq, ollama
 ```
@@ -192,6 +224,17 @@ NODE_ENV=production node server.js
 ```
 
 **Platforms:** Vercel, Netlify, Railway, Heroku, AWS
+
+### Free-Tier / Render Recommendation
+
+To stay within a 512MB free tier without OOM crashes:
+
+- Set `LIGHTHOUSE_MODE=psi` on the backend — Lighthouse runs via the free
+  PageSpeed Insights API, so **no Chrome is launched on the host**.
+- Set `AI_MODEL=google/gemma-4-26b-a4b-it:free` (a free, vision-capable model).
+- No `PUPPETEER_EXECUTABLE_PATH` is needed in `psi` mode.
+- If you later upgrade or self-host with more RAM and want to run Chrome locally,
+  switch to `LIGHTHOUSE_MODE=local` and provide a Chrome binary.
 
 ## 🤝 Contributing
 

@@ -1,11 +1,11 @@
-import lighthouseService from './lighthouse.service.js';
-import axeService from './axe.service.js';
-import resultsMerger from './results-merger.service.js';
-import pa11yService from '../accessibility/pa11yService.js';
-import keyboardService from '../accessibility/keyboardService.js';
-import { aiAnalysisService } from '../ai/index.js';
-import logger from '../../utils/logger.js';
-import { createInternalError } from '../../utils/errorHandler.js';
+import lighthouseService from "./lighthouse.service.js";
+import axeService from "./axe.service.js";
+import resultsMerger from "./results-merger.service.js";
+import pa11yService from "../accessibility/pa11yService.js";
+import keyboardService from "../accessibility/keyboardService.js";
+import { aiAnalysisService } from "../ai/index.js";
+import logger from "../../utils/logger.js";
+import { createInternalError } from "../../utils/errorHandler.js";
 
 /**
  * Analysis Orchestrator Service
@@ -34,7 +34,7 @@ class AnalysisOrchestratorService {
       onProgress,
     } = options;
 
-    logger.info('Starting website analysis orchestration', {
+    logger.info("Starting website analysis orchestration", {
       url,
       includeAI,
       includeAxe,
@@ -45,7 +45,7 @@ class AnalysisOrchestratorService {
     try {
       // Send initial progress
       this._sendProgress(onProgress, {
-        message: 'Starting comprehensive website analysis...',
+        message: "Starting comprehensive website analysis...",
         progress: 0,
       });
 
@@ -57,7 +57,7 @@ class AnalysisOrchestratorService {
       try {
         scanResults = await this._runLighthouseAnalysis(url, onProgress);
       } catch (e) {
-        logger.error('Lighthouse failed', e);
+        logger.error("Lighthouse failed", e);
         toolErrors.lighthouse = e.message;
         this._sendProgress(onProgress, {
           message: `Lighthouse analysis failed: ${e.message}`,
@@ -69,13 +69,13 @@ class AnalysisOrchestratorService {
       let axeResults = null;
       if (includeAxe) {
         this._sendProgress(onProgress, {
-          message: 'Running Axe-Core accessibility analysis...',
+          message: "Running Axe-Core accessibility analysis...",
           progress: 10,
         });
         try {
           axeResults = await this._runAxeAnalysis(url);
         } catch (e) {
-          logger.error('Axe failed', e);
+          logger.error("Axe failed", e);
           toolErrors.axe = e.message;
           this._sendProgress(onProgress, {
             message: `Axe-Core analysis failed: ${e.message}`,
@@ -88,13 +88,13 @@ class AnalysisOrchestratorService {
       let pa11yResults = null;
       if (includePa11y) {
         this._sendProgress(onProgress, {
-          message: 'Running Pa11y multi-engine analysis...',
+          message: "Running Pa11y multi-engine analysis...",
           progress: 15,
         });
         try {
           pa11yResults = await this._runPa11yAnalysis(url);
         } catch (e) {
-          logger.error('Pa11y failed', e);
+          logger.error("Pa11y failed", e);
           toolErrors.pa11y = e.message;
           this._sendProgress(onProgress, {
             message: `Pa11y analysis failed: ${e.message}`,
@@ -107,13 +107,13 @@ class AnalysisOrchestratorService {
       let keyboardResults = null;
       if (includeKeyboard) {
         this._sendProgress(onProgress, {
-          message: 'Running keyboard accessibility testing...',
+          message: "Running keyboard accessibility testing...",
           progress: 20,
         });
         try {
           keyboardResults = await this._runKeyboardAnalysis(url);
         } catch (e) {
-          logger.error('Keyboard analysis failed', e);
+          logger.error("Keyboard analysis failed", e);
           toolErrors.keyboard = e.message;
           this._sendProgress(onProgress, {
             message: `Keyboard analysis failed: ${e.message}`,
@@ -125,7 +125,7 @@ class AnalysisOrchestratorService {
 
       const parallelAnalysisTime = Date.now() - startTime;
 
-      logger.performance('Sequential analysis completed', {
+      logger.performance("Sequential analysis completed", {
         duration: parallelAnalysisTime,
         includedAxe: includeAxe,
         includedPa11y: includePa11y,
@@ -142,9 +142,9 @@ class AnalysisOrchestratorService {
 
       // Merge all accessibility results
       let finalResults = mainResults;
-      if (includeAxe && axeResults) {
+      if (axeResults || pa11yResults) {
         this._sendProgress(onProgress, {
-          message: 'Merging accessibility results...',
+          message: "Merging accessibility results...",
           progress: 50,
         });
 
@@ -154,10 +154,10 @@ class AnalysisOrchestratorService {
             ...mainResults,
           },
           axeResults,
-          pa11yResults
+          pa11yResults,
         );
 
-        logger.success('Combined analysis completed', {
+        logger.success("Combined analysis completed", {
           lighthouseScore: mainResults.accessibility?.score,
           axeScore: axeService.calculateScore(axeResults).score,
           pa11yScore: pa11yResults?.score?.score,
@@ -168,9 +168,8 @@ class AnalysisOrchestratorService {
       // Add keyboard issues to accessibility.issues array
       if (keyboardResults && finalResults.accessibility) {
         // Convert keyboard issues to common format and add to accessibility issues
-        const { convertKeyboardIssueToCommon } = await import(
-          '../../utils/transformers.js'
-        );
+        const { convertKeyboardIssueToCommon } =
+          await import("../../utils/transformers.js");
 
         const allKeyboardIssues = [
           ...(keyboardResults.interactiveElements?.issues || []),
@@ -181,7 +180,7 @@ class AnalysisOrchestratorService {
         ];
 
         const keyboardFormattedIssues = allKeyboardIssues.map(
-          convertKeyboardIssueToCommon
+          convertKeyboardIssueToCommon,
         );
 
         // Add keyboard issues to main accessibility issues
@@ -200,10 +199,7 @@ class AnalysisOrchestratorService {
         finalResults.keyboard = keyboardResults;
       }
 
-      if (pa11yResults && !includeAxe) {
-        // If Axe wasn't included, add Pa11y separately
-        finalResults.pa11y = pa11yResults;
-      }
+      // (Pa11y is now merged above along with Axe)
 
       // Build base response with all accessibility data
       const baseResponse = {
@@ -236,11 +232,11 @@ class AnalysisOrchestratorService {
         const aiResults = await this._runAIAnalysisParallel(
           mainResults,
           scanResults,
-          onProgress
+          onProgress,
         );
         const aiAnalysisTime = Date.now() - aiStartTime;
 
-        logger.performance('AI analysis completed', {
+        logger.performance("AI analysis completed", {
           duration: aiAnalysisTime,
         });
 
@@ -258,7 +254,7 @@ class AnalysisOrchestratorService {
         progress: 100,
       };
 
-      logger.success('Website analysis orchestration completed', {
+      logger.success("Website analysis orchestration completed", {
         url,
         includeAI,
         includeAxe,
@@ -266,8 +262,8 @@ class AnalysisOrchestratorService {
 
       return finalResponse;
     } catch (error) {
-      logger.error('Analysis orchestration failed', error, { url });
-      throw createInternalError('Analysis orchestration failed', error);
+      logger.error("Analysis orchestration failed", error, { url });
+      throw createInternalError("Analysis orchestration failed", error);
     }
   }
 
@@ -276,7 +272,7 @@ class AnalysisOrchestratorService {
    * @private
    */
   async _runLighthouseAnalysis(url, onProgress) {
-    logger.info('Running Lighthouse analysis', { url });
+    logger.info("Running Lighthouse analysis", { url });
 
     const sendProgress = (progress) => {
       this._sendProgress(onProgress, progress);
@@ -284,7 +280,7 @@ class AnalysisOrchestratorService {
 
     const results = await lighthouseService.scanWebsite(url, sendProgress);
 
-    logger.success('Lighthouse analysis completed', {
+    logger.success("Lighthouse analysis completed", {
       pagesScanned: results.stats.pagesScanned,
     });
 
@@ -296,11 +292,11 @@ class AnalysisOrchestratorService {
    * @private
    */
   async _runAxeAnalysis(url) {
-    logger.info('Running Axe-Core analysis', { url });
+    logger.info("Running Axe-Core analysis", { url });
 
     const results = await axeService.analyzePage(url);
 
-    logger.success('Axe-Core analysis completed', {
+    logger.success("Axe-Core analysis completed", {
       violations: results.violations.length,
     });
 
@@ -312,11 +308,11 @@ class AnalysisOrchestratorService {
    * @private
    */
   async _runPa11yAnalysis(url) {
-    logger.info('Running Pa11y analysis', { url });
+    logger.info("Running Pa11y analysis", { url });
 
     const results = await pa11yService.analyzePage(url);
 
-    logger.success('Pa11y analysis completed', {
+    logger.success("Pa11y analysis completed", {
       issues: results.summary.total,
       errors: results.summary.errors,
     });
@@ -329,11 +325,11 @@ class AnalysisOrchestratorService {
    * @private
    */
   async _runKeyboardAnalysis(url) {
-    logger.info('Running keyboard accessibility analysis', { url });
+    logger.info("Running keyboard accessibility analysis", { url });
 
     const results = await keyboardService.analyzePage(url);
 
-    logger.success('Keyboard analysis completed', {
+    logger.success("Keyboard analysis completed", {
       score: results.score.score,
       issues: results.summary.totalIssues,
     });
@@ -346,7 +342,7 @@ class AnalysisOrchestratorService {
    * @private
    */
   async _runAIAnalysisParallel(mainResults, scanResults, onProgress) {
-    logger.info('Running AI analysis in parallel');
+    logger.info("Running AI analysis in parallel");
 
     try {
       // Collect all issues for fix generation
@@ -354,19 +350,19 @@ class AnalysisOrchestratorService {
       (scanResults?.urls || []).forEach((urlResult) => {
         if (urlResult.scores) {
           // Collect issues from all categories
-          ['performance', 'accessibility', 'bestPractices', 'seo'].forEach(
+          ["performance", "accessibility", "bestPractices", "seo"].forEach(
             (category) => {
               if (urlResult.scores[category]?.issues) {
                 allIssues.push(...urlResult.scores[category].issues);
               }
-            }
+            },
           );
         }
       });
 
       // Run insights and fixes generation in parallel
       this._sendProgress(onProgress, {
-        message: 'Generating AI insights and fixes...',
+        message: "Generating AI insights and fixes...",
         progress: 75,
       });
 
@@ -380,26 +376,26 @@ class AnalysisOrchestratorService {
 
       if (insights) {
         this._sendProgress(onProgress, {
-          message: 'AI insights generated',
+          message: "AI insights generated",
           progress: 85,
         });
       }
 
       if (fixes) {
         this._sendProgress(onProgress, {
-          message: 'AI fixes generated',
+          message: "AI fixes generated",
           progress: 95,
         });
       }
 
-      logger.success('AI analysis completed', {
+      logger.success("AI analysis completed", {
         hasInsights: !!insights,
         hasFixes: !!fixes,
       });
 
       return { insights, fixes };
     } catch (error) {
-      logger.error('AI analysis failed', error);
+      logger.error("AI analysis failed", error);
       // Don't throw - AI is optional
       return { insights: null, fixes: null };
     }
@@ -411,7 +407,7 @@ class AnalysisOrchestratorService {
    * @deprecated Use _runAIAnalysisParallel for better performance
    */
   async _runAIAnalysis(mainResults, scanResults, onProgress) {
-    logger.info('Running AI analysis');
+    logger.info("Running AI analysis");
 
     let insights = null;
     let fixes = null;
@@ -419,7 +415,7 @@ class AnalysisOrchestratorService {
     try {
       // Generate AI insights
       this._sendProgress(onProgress, {
-        message: 'Generating AI insights...',
+        message: "Generating AI insights...",
         progress: 75,
       });
 
@@ -427,7 +423,7 @@ class AnalysisOrchestratorService {
 
       if (insights) {
         this._sendProgress(onProgress, {
-          message: 'AI insights generated',
+          message: "AI insights generated",
           progress: 85,
         });
       }
@@ -437,19 +433,19 @@ class AnalysisOrchestratorService {
       (scanResults?.urls || []).forEach((urlResult) => {
         if (urlResult.scores) {
           // Collect issues from all categories
-          ['performance', 'accessibility', 'bestPractices', 'seo'].forEach(
+          ["performance", "accessibility", "bestPractices", "seo"].forEach(
             (category) => {
               if (urlResult.scores[category]?.issues) {
                 allIssues.push(...urlResult.scores[category].issues);
               }
-            }
+            },
           );
         }
       });
 
       if (allIssues.length > 0) {
         this._sendProgress(onProgress, {
-          message: 'Generating AI-powered fixes...',
+          message: "Generating AI-powered fixes...",
           progress: 90,
         });
 
@@ -457,18 +453,18 @@ class AnalysisOrchestratorService {
 
         if (fixes) {
           this._sendProgress(onProgress, {
-            message: 'AI fixes generated',
+            message: "AI fixes generated",
             progress: 95,
           });
         }
       }
 
-      logger.success('AI analysis completed', {
+      logger.success("AI analysis completed", {
         hasInsights: !!insights,
         hasFixes: !!fixes,
       });
     } catch (error) {
-      logger.error('AI analysis failed', error);
+      logger.error("AI analysis failed", error);
       // Don't throw - AI is optional
     }
 
@@ -480,7 +476,7 @@ class AnalysisOrchestratorService {
    * @private
    */
   _sendProgress(callback, data) {
-    if (callback && typeof callback === 'function') {
+    if (callback && typeof callback === "function") {
       callback(data);
     }
   }
